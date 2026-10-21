@@ -1,10 +1,12 @@
 import { createBrowserDraftStore } from "@/runtime/persistence/drafts"
 import { basePath } from "./base-path"
 import type { Platform } from "./platform"
+import { createWebFetch } from "./web-fetch"
 
 export function createWebPlatform(version: string) {
   const platform: Platform = {
     platform: "web",
+    fetch: createWebFetch(),
     draftStore: createBrowserDraftStore(),
     version,
     openExternal(value) {
