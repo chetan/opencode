@@ -31,6 +31,8 @@ export function serviceWorker(directory: string) {
           navigateFallbackDenylist: [
             new RegExp(`^${prefix}(?:api|auth)(?:/|$)`),
             new RegExp(`^${prefix}(?:_assets|assets)(?:/|$)`),
+            // Proxy recovery must reach the network without removing the installed worker.
+            /[?&]reauth=/,
           ],
         }
       },
