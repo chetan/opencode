@@ -1012,9 +1012,9 @@ test("projects, sessions, and worktrees stay with their own server and project",
   await expectDiscovered(b)
   // Each server lists only its own projects, under its own row, and the focused server only its own sessions.
   await expect(b.locator("[data-home-row]")).toHaveText([
-    /127\.0\.0\.1:4096/,
-    new RegExp(betaName),
+    /This computer/,
     new RegExp(fixture.project.name),
+    new RegExp(betaName),
     /Remote/,
     /gamma-remote/,
   ])
@@ -1026,7 +1026,7 @@ test("projects, sessions, and worktrees stay with their own server and project",
     .click()
   await expect(row(b, "Gamma plan")).toBeVisible()
   await expect(row(b, "Beta plan")).toHaveCount(0)
-  await b.locator("[data-home-row]").filter({ hasText: "4096" }).getByRole("button", { name: /4096/ }).click()
+  await b.locator("[data-home-row]").filter({ hasText: "This computer" }).getByRole("button", { name: /This computer/ }).click()
   await expect(row(b, "Beta plan")).toBeVisible()
 
   // Selecting a project scopes the sessions to its directories.
@@ -1039,7 +1039,7 @@ test("projects, sessions, and worktrees stay with their own server and project",
   await close()
 })
 
-test("a failed project or session fetch does not erase projects, sessions, or the selection", async ({
+test("a failed project or session fetch preserves local usage and restores the selection after recovery", async ({
   browser,
   baseURL,
 }) => {
@@ -1050,15 +1050,15 @@ test("a failed project or session fetch does not erase projects, sessions, or th
   await expect(projectRow(a, betaName)).toHaveAttribute("data-selected", "")
 
   // The server inventory answers after storage loads; the restored selection must wait for it.
-  const projects = await holdRoute(a, (url) => url.pathname === "/api/project")
+  const projectRoute = /\/api\/project(?:\?|$)/
+  const projects = await holdRoute(a, projectRoute)
   await a.reload()
   await projects.arrived
-  // Until the server answers, the opened project shows its folder name.
-  await expect(projectRow(a, "SmokeProject")).toBeVisible()
+  // Project metadata now belongs to the server; storage alone does not render a placeholder project.
   await expect(projectRow(a, betaName)).toHaveCount(0)
   projects.release()
   await expect(projectRow(a, betaName)).toHaveAttribute("data-selected", "")
-  await a.unroute((url) => url.pathname === "/api/project")
+  await a.unroute(projectRoute)
 
   const fail = (url: URL) => url.pathname === "/api/project" || url.pathname === "/api/session"
   await a.route(fail, (route) =>
@@ -1069,10 +1069,9 @@ test("a failed project or session fetch does not erase projects, sessions, or th
   const failed = a.waitForResponse((response) => fail(new URL(response.url())) && response.status() === 500)
   await a.reload()
   await failed
-  // The project this browser opened stays listed, and its stored list is not overwritten.
-  await expect(projectRow(a, "SmokeProject")).toBeVisible()
+  // A failed cold load has no metadata to display, but must not overwrite this browser's usage preferences.
   const stored = await a.evaluate(() => localStorage.getItem("opencode.global.dat:server"))
-  expect(JSON.parse(stored ?? "{}").projects.local).toEqual([{ worktree: fixture.directory, expanded: true }])
+  expect(JSON.parse(stored ?? "{}").usedProjectIDs.local).toContain(fixture.project.id)
 
   await a.unroute(fail)
   await a.reload()
