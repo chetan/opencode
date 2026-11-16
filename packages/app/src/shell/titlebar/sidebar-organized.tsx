@@ -256,7 +256,7 @@ function ProjectList(props: {
   const ctx = useServerCtx(() => props.connection)
 
   const projects = createMemo(() => {
-    const list = ctx()?.projects.used() ?? []
+    const list = ctx()?.projects.visible() ?? []
 
     const order = props.state.order[server] ?? []
 

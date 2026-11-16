@@ -44,7 +44,7 @@ import { formatServerError } from "./errors"
 import { useSettings } from "@/settings/model"
 import { timelinePreset } from "@opencode/session-ui/timeline/detail"
 import type { SessionInfo } from "@opencode/client/promise"
-import { projectForSession } from "@/shell/layout/helpers"
+import { discoverServerProjects, projectForSession } from "@/shell/layout/helpers"
 import { isProjectDirectory } from "@/workspaces/paths"
 import type { Project } from "@/runtime/server/types"
 
@@ -319,6 +319,16 @@ function createServerController(
     )
   }
 
+  // Local usage is a preference, not the inventory: a fresh browser still discovers the server's other projects.
+  const visible = createMemo(() => [
+    ...used(),
+    ...discoverServerProjects({
+      opened: used(),
+      closed: list().flatMap((project) => (projects.hidden().includes(project.id) ? [project.worktree] : [])),
+      known: unique(),
+    }),
+  ])
+
   // Older builds kept opened directories locally; once the server's list loads they become used project IDs.
   createEffect(() => {
     const legacy = projects.legacy()
@@ -360,6 +370,7 @@ function createServerController(
       list,
       unique,
       used,
+      visible,
       add,
       forDirectory,
       forSession: (session: SessionInfo): Project | undefined => projectForSession(session, list()),

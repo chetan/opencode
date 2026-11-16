@@ -16,7 +16,7 @@ import {
 } from "solid-js"
 import { notifySessionTabsRemoved } from "@/shell/titlebar/session-events"
 import { useCommand } from "@/shell/commands/command"
-import { HOME_SESSION_LIMIT, mergeHomeSessionIndex, retainHomeSessions } from "@/home/sessions/index"
+import { createReconnectTracker, HOME_SESSION_LIMIT, mergeHomeSessionIndex, retainHomeSessions } from "@/home/sessions/index"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ServerConnection } from "@/runtime/server/registry"
 import { useGlobal } from "@/runtime/server/runtime"
@@ -231,6 +231,30 @@ export function createHomeSessionsController(home: HomeController) {
   const scoped = useQuery(() =>
     projectSessionsQuery(home.server.focused(), home.server.focusedContext(), projectDirectories()),
   )
+  // The fetched index is a snapshot; keep it consistent with what other clients do on the same server.
+  createEffect(() => {
+    const ctx = home.server.focusedContext()
+    const conn = home.server.focused()
+
+    if (!ctx || !conn) return
+    onCleanup(
+      ctx.data.on("session.deleted", (event) =>
+        queryClient.setQueryData<SessionInfo[]>(["home-sessions", conn], (current) =>
+          current?.filter((session) => session.id !== event.data.sessionID),
+        ),
+      ),
+    )
+  })
+
+  const reconnected = createReconnectTracker()
+  createEffect(() => {
+    const conn = home.server.focused()
+    const status = home.server.focusedContext()?.sdk.connection.status()
+
+    if (!conn || !reconnected(conn, status)) return
+    // Sessions created, renamed, or deleted while the stream was down sent events this client never received.
+    void queryClient.invalidateQueries({ queryKey: ["home-sessions", conn], exact: true })
+  })
 
   const indexedSessions = createMemo(() => {
     const ctx = home.server.focusedContext()

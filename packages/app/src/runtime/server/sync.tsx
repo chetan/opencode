@@ -1,5 +1,5 @@
 import type { Config, Project } from "@/runtime/server/types"
-import { getOwner, onCleanup } from "solid-js"
+import { getOwner, onCleanup, untrack } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/runtime/i18n/language"
 import { type ServerSDK } from "./client"
@@ -148,10 +148,26 @@ function createServerSyncContextInner(serverSDK: ServerSDK, data: Data) {
   const refreshProjects = () =>
     loadProjects({ scope: serverSDK.scope, project: serverSDK.api.project, setGlobalStore, queryClient })
 
+  // Projects whose inventory reload a session event already requested; a project the server never lists
+  // must not reload the inventory on every one of its session events.
+  const reloaded = new Set<string>()
+
   const unsub = serverSDK.event.listen((event) => {
     connection.handleEvent({ type: event.type })
 
     if (event.type === "project.updated") applyProjectUpdate(event.data)
+
+    // The server registers a project on another client's first session in its directory and publishes only
+    // session.created for it, not project.updated. Reload the inventory so every connected client lists it.
+    if (
+      event.type === "session.created" &&
+      !reloaded.has(event.data.projectID) &&
+      !untrack(() => globalStore.project).some((project) => project.id === event.data.projectID)
+    ) {
+      reloaded.add(event.data.projectID)
+
+      if (bootstrap.data !== undefined && !bootstrap.isFetching) void bootstrap.refetch()
+    }
 
     if (event.type === "worktree.updated") {
       void worktrees.list(event.data.projectID)

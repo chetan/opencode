@@ -54,12 +54,14 @@ export function createServerProjects(input: {
   setStore: SetStoreFunction<StoredState>
 }) {
   const used = () => input.store.usedProjectIDs[input.scope()] ?? []
+  const hidden = () => input.store.hiddenProjectIDs[input.scope()] ?? []
 
   const use = (projectIDs: string[]) => {
     const current = used()
     const next = [...new Set([...current, ...projectIDs])]
 
     if (next.length !== current.length) input.setStore("usedProjectIDs", input.scope(), next)
+    input.setStore("hiddenProjectIDs", input.scope(), hidden().filter((id) => !projectIDs.includes(id)))
   }
 
   return {
@@ -73,8 +75,10 @@ export function createServerProjects(input: {
       })
     },
     used,
+    hidden,
     use,
     hide(projectIDs: string[]) {
+      input.setStore("hiddenProjectIDs", input.scope(), [...new Set([...hidden(), ...projectIDs])])
       input.setStore(
         "usedProjectIDs",
         input.scope(),
@@ -238,7 +242,7 @@ export const { use: useServers, provider: ServersProvider } = createSimpleContex
         previousKey: "server.v3",
       },
       ServerState,
-      { list: [], hidden: {}, lastProjectID: {}, usedProjectIDs: {}, hostnames: {}, projects: {} },
+      { list: [], hidden: {}, lastProjectID: {}, usedProjectIDs: {}, hiddenProjectIDs: {}, hostnames: {}, projects: {} },
     )
 
     const language = useLanguage()

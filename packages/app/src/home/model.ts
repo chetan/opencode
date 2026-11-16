@@ -37,7 +37,7 @@ export function createHomeController() {
           failed: isServerFailed(global.servers.health[key]),
           connected: ctx?.sdk.connection.status() === "connected",
           projectsReady: !!ctx?.sync.project.ready() && servers.projects.forServer(key).legacy() === undefined,
-          usedProjects: (ctx?.projects.used() ?? []).map((project) => ({ id: project.id, worktree: project.worktree })),
+          usedProjects: (ctx?.projects.visible() ?? []).map((project) => ({ id: project.id, worktree: project.worktree })),
         }
       }),
     }),
@@ -112,8 +112,8 @@ export function createHomeController() {
 
   const focusedServerCtx = useServerCtx(focusedServer)
   const focusedSync = () => focusedServerCtx()?.sync
-  // Home lists the server's projects this client has used.
-  const projects = createMemo(() => focusedServerCtx()?.projects.used() ?? [])
+  // Home lists locally used projects and discovers the rest from the server.
+  const projects = createMemo(() => focusedServerCtx()?.projects.visible() ?? [])
 
   const selectedProject = createMemo(() => {
     const directory = selection().directory

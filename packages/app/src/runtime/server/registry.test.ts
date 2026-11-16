@@ -19,6 +19,7 @@ function serverSchema() {
     hidden: {},
     lastProjectID: {},
     usedProjectIDs: {},
+    hiddenProjectIDs: {},
     hostnames: {},
     projects: {},
   })
@@ -149,4 +150,21 @@ test("used and last projects follow dynamic server scopes, and migration consume
   expect(store.projects).toEqual({ other: [{ worktree: "/b" }] })
   expect(store.lastProjectID).toEqual({ local: "a", [props.server]: "remote-project" })
   expect(store.usedProjectIDs).toEqual({ local: ["a"], [props.server]: ["remote-project"] })
+})
+
+test("hiding a discovered project stays local and using it again unhides it", () => {
+  const [store, setStore] = createStore(Schema.decodeUnknownSync(serverSchema())({}))
+
+  const projects = createServerProjects({
+    store,
+    setStore,
+    scope: () => ServerScope.fromServerKey(ServerConnection.Key.make("https://remote.example")),
+  })
+
+  projects.hide(["discovered"])
+  expect(projects.hidden()).toEqual(["discovered"])
+  expect(projects.used()).toEqual([])
+  projects.touch("discovered")
+  expect(projects.hidden()).toEqual([])
+  expect(projects.used()).toEqual(["discovered"])
 })
