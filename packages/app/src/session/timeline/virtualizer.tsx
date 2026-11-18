@@ -111,7 +111,7 @@ type Input = {
   follow: TimelineFollow
   scroll: Accessor<{ overflow: boolean; jump: boolean }>
   onResumeScroll: (behavior?: ScrollBehavior) => void
-  setScrollRef: (element: HTMLDivElement | undefined) => void
+  setScrollRef: (element: HTMLDivElement | undefined, readOffset: () => number) => void
   /** The rows' content changed height. */
   onContentResize: () => void
   /** Height of the composer region floating over the timeline's bottom edge, where the timeline fades out. */
@@ -338,13 +338,20 @@ export function createTimelineVirtualizer(input: Input) {
         dispatchCold(CHECK_REQUESTED)
       }
 
-      return observeElementOffsetReconnectAware(instance, reportOffset, () => {
-        if (!active()) return
-        virtualContent?.querySelectorAll<HTMLDivElement>("[data-index]").forEach(virtualizer.measureElement)
+      return observeElementOffsetReconnectAware(
+        instance,
+        (offset, scrolling) => {
+          reportOffset?.(offset, scrolling)
+          if (scrolling && active()) input.onHistoryScroll()
+        },
+        () => {
+          if (!active()) return
+          virtualContent?.querySelectorAll<HTMLDivElement>("[data-index]").forEach(virtualizer.measureElement)
 
-        if (input.follow.following()) virtualizer.scrollToEnd()
-        dispatchCold(CHECK_REQUESTED)
-      })
+          if (input.follow.following()) virtualizer.scrollToEnd()
+          dispatchCold(CHECK_REQUESTED)
+        },
+      )
     },
     initialOffset: () => (input.follow.following() ? Number.MAX_SAFE_INTEGER : 0),
     initialMeasurementsCache: initialMeasurements,
@@ -385,13 +392,16 @@ export function createTimelineVirtualizer(input: Input) {
     get getItemKey() {
       return getItemKey()
     },
-    get anchorTo() {
-      return input.follow.following() ? "end" : "start"
-    },
+    // Key-based prepend anchoring is part of TanStack's end mode, including when detached.
+    anchorTo: "end",
     get followOnAppend() {
       return input.follow.following()
     },
-    scrollEndThreshold: 80,
+    get scrollEndThreshold() {
+      // The follow machine owns end pinning. A detached reader must not be
+      // pinned by a row resize merely because they are near the end.
+      return input.follow.following() ? 80 : -1
+    },
     get scrollMargin() {
       // Empty projections still need the bottom spacer for running status.
       return rows().length > 0 ? topOffset() : 0
@@ -407,6 +417,10 @@ export function createTimelineVirtualizer(input: Input) {
       return rangeExtractor()
     },
   })
+
+  // Unlike scrollTop, this includes any prepend offset TanStack is holding
+  // visually until the native gesture ends.
+  const readOffset = () => virtualizer.scrollOffset ?? listRoot()?.scrollTop ?? 0
 
   const resizeItem = virtualizer.resizeItem
   const pendingSizes = new Map<number, { key: string; size: number }>()
@@ -634,7 +648,7 @@ export function createTimelineVirtualizer(input: Input) {
     if (!active()) return
     const root = listRoot()
 
-    if (root) input.setScrollRef(root)
+    if (root) input.setScrollRef(root, readOffset)
     input.setVisibleRef?.(visibleArea())
     queueMicrotask(() => {
       if (!active() || !root?.isConnected) return
@@ -908,7 +922,7 @@ export function createTimelineVirtualizer(input: Input) {
     scrollTop = root.scrollTop
     maxScroll = root.scrollHeight - root.clientHeight
 
-    if (active()) input.setScrollRef(root)
+    if (active()) input.setScrollRef(root, readOffset)
     viewportObserver?.observe(root)
     dispatchCold(CHECK_REQUESTED)
     // The scrollbar thumb sits beside the viewport and stops its pointerdown from propagating, so
@@ -1063,7 +1077,6 @@ export function createTimelineVirtualizer(input: Input) {
     input.follow.dispatch(scrollEvent)
     dispatchCold(CHECK_REQUESTED)
     input.onScheduleScrollState(root)
-    input.onHistoryScroll()
   }
 
   function View(props: ViewProps) {
@@ -1251,7 +1264,7 @@ export function createTimelineVirtualizer(input: Input) {
     dispatchCold(DISPOSED)
 
     if (active()) {
-      input.setScrollRef(undefined)
+      input.setScrollRef(undefined, readOffset)
       input.setRevealMessage?.(() => {})
       input.setScrollToEnd?.(() => {})
       input.setPage?.(() => {})

@@ -83,7 +83,7 @@ type MessageTimelineProps = {
   actions?: SessionUserActions
   scroll: { overflow: boolean; jump: boolean }
   onResumeScroll: (behavior?: ScrollBehavior) => void
-  setScrollRef: (el: HTMLDivElement | undefined) => void
+  setScrollRef: (el: HTMLDivElement | undefined, readOffset: () => number) => void
   onScheduleScrollState: (el: HTMLDivElement) => void
   follow: TimelineFollow
   onUserScroll: (target?: EventTarget | null) => void
