@@ -1,0 +1,348 @@
+diff --git a/dist/cjs/index.cjs b/dist/cjs/index.cjs
+index e08c978a8870d1560c13e30abc3a818823001f0c..1458ce4e3618815122df830b218e763f91c08d82 100644
+--- a/dist/cjs/index.cjs
++++ b/dist/cjs/index.cjs
+@@ -392,7 +392,7 @@ class Virtualizer {
+         if (v !== void 0) merged[key] = v;
+       }
+       const prevOptions = this.options;
+-      let anchor = null;
++      let anchors = null;
+       let followOnAppend = null;
+       let edgeKeysChanged = false;
+       if (prevOptions !== void 0 && prevOptions.enabled && merged.enabled && merged.anchorTo === "end" && this.scrollElement !== null) {
+@@ -409,7 +409,13 @@ class Virtualizer {
+           edgeKeysChanged = true;
+           const item = prevCount > 0 ? this.getVirtualItemForOffset(this.getScrollOffset()) ?? measurements[0] : null;
+           if (item) {
+-            anchor = [item.key, this.getScrollOffset() - item.start];
++            anchors = [];
++            const offset = this.getScrollOffset();
++            for (let index = item.index; index < prevCount && anchors.length < 100; index++) {
++              const candidate = measurements[index];
++              if (!candidate) break;
++              anchors.push([candidate.key, offset - candidate.start]);
++            }
+           }
+           const behavior = merged.followOnAppend === true ? "auto" : merged.followOnAppend || null;
+           if (behavior && nextCount > 0 && this.isAtEnd(prevOptions.scrollEndThreshold) && (prevCount === 0 || merged.getItemKey(nextCount - 1) !== prevLastKey)) {
+@@ -430,23 +436,22 @@ class Virtualizer {
+         this.itemSizeCacheVersion++;
+       }
+       let anchorDelta = null;
+-      if (anchor && this.scrollOffset !== null && !this._awaitingCommandReadBack()) {
+-        const [anchorKey, anchorOffset] = anchor;
++      if (anchors?.length && this.scrollOffset !== null && !this._awaitingCommandReadBack()) {
+         const newMeasurements = this.getMeasurements();
+         const { count, getItemKey } = this.options;
+-        let idx = 0;
+-        while (idx < count && getItemKey(idx) !== anchorKey) {
+-          idx++;
+-        }
+-        if (idx < count) {
++        const indexByKey = new Map();
++        for (let i = 0; i < count; i++) indexByKey.set(getItemKey(i), i);
++        for (const [anchorKey, anchorOffset] of anchors) {
++          const idx = indexByKey.get(anchorKey);
++          if (idx === void 0) continue;
+           const anchorItem = newMeasurements[idx];
+-          if (anchorItem) {
+-            const newOffset = Math.max(0, anchorItem.start + anchorOffset);
+-            if (!followOnAppend && newOffset !== this.scrollOffset) {
+-              anchorDelta = newOffset - this.scrollOffset;
+-              this.scrollOffset = newOffset;
+-            }
++          if (!anchorItem) continue;
++          const newOffset = Math.max(0, anchorItem.start + anchorOffset);
++          if (!followOnAppend && newOffset !== this.scrollOffset) {
++            anchorDelta = newOffset - this.scrollOffset;
++            this.scrollOffset = newOffset;
+           }
++          break;
+         }
+       }
+       if (followOnAppend) {
+diff --git a/dist/cjs/ios-gesture.cjs b/dist/cjs/ios-gesture.cjs
+index 9b76f2349e8c90d4171853fb9a947fbd3134941b..2971af9e1f8ce07f57d513c8c010516cb4d71372 100644
+--- a/dist/cjs/ios-gesture.cjs
++++ b/dist/cjs/ios-gesture.cjs
+@@ -78,23 +78,31 @@ class IosGesture {
+       this._touch = null;
+     };
+     this.listen = (target) => {
+-      const onTouchStart = () => this.touchStart();
+-      const onTouchEnd = () => this.touchEnd();
++      let touchTarget = null;
++      const clearTouchTarget = () => {
++        touchTarget?.removeEventListener("touchend", onTouchEnd, touchListenerOptions);
++        touchTarget?.removeEventListener("touchcancel", onTouchEnd, touchListenerOptions);
++        touchTarget = null;
++      };
++      const onTouchEnd = () => {
++        clearTouchTarget();
++        this.touchEnd();
++      };
++      const onTouchStart = (event) => {
++        clearTouchTarget();
++        touchTarget = event.target ?? target;
++        touchTarget.addEventListener("touchend", onTouchEnd, touchListenerOptions);
++        touchTarget.addEventListener("touchcancel", onTouchEnd, touchListenerOptions);
++        this.touchStart();
++      };
+       target.addEventListener("touchstart", onTouchStart, touchListenerOptions);
+-      target.addEventListener("touchend", onTouchEnd, touchListenerOptions);
+-      target.addEventListener("touchcancel", onTouchEnd, touchListenerOptions);
+       return () => {
+         target.removeEventListener(
+           "touchstart",
+           onTouchStart,
+           touchListenerOptions
+         );
+-        target.removeEventListener("touchend", onTouchEnd, touchListenerOptions);
+-        target.removeEventListener(
+-          "touchcancel",
+-          onTouchEnd,
+-          touchListenerOptions
+-        );
++        clearTouchTarget();
+         this.end();
+       };
+     };
+diff --git a/dist/esm/index.js b/dist/esm/index.js
+index abe4b4906a110b39d76eb8926db4af5683acc1d2..691cb944802e2d931e433469344fe6d3fa05ac5b 100644
+--- a/dist/esm/index.js
++++ b/dist/esm/index.js
+@@ -391,7 +391,7 @@ class Virtualizer {
+         if (v !== void 0) merged[key] = v;
+       }
+       const prevOptions = this.options;
+-      let anchor = null;
++      let anchors = null;
+       let followOnAppend = null;
+       let edgeKeysChanged = false;
+       if (prevOptions !== void 0 && prevOptions.enabled && merged.enabled && merged.anchorTo === "end" && this.scrollElement !== null) {
+@@ -408,7 +408,13 @@ class Virtualizer {
+           edgeKeysChanged = true;
+           const item = prevCount > 0 ? this.getVirtualItemForOffset(this.getScrollOffset()) ?? measurements[0] : null;
+           if (item) {
+-            anchor = [item.key, this.getScrollOffset() - item.start];
++            anchors = [];
++            const offset = this.getScrollOffset();
++            for (let index = item.index; index < prevCount && anchors.length < 100; index++) {
++              const candidate = measurements[index];
++              if (!candidate) break;
++              anchors.push([candidate.key, offset - candidate.start]);
++            }
+           }
+           const behavior = merged.followOnAppend === true ? "auto" : merged.followOnAppend || null;
+           if (behavior && nextCount > 0 && this.isAtEnd(prevOptions.scrollEndThreshold) && (prevCount === 0 || merged.getItemKey(nextCount - 1) !== prevLastKey)) {
+@@ -429,23 +435,22 @@ class Virtualizer {
+         this.itemSizeCacheVersion++;
+       }
+       let anchorDelta = null;
+-      if (anchor && this.scrollOffset !== null && !this._awaitingCommandReadBack()) {
+-        const [anchorKey, anchorOffset] = anchor;
++      if (anchors?.length && this.scrollOffset !== null && !this._awaitingCommandReadBack()) {
+         const newMeasurements = this.getMeasurements();
+         const { count, getItemKey } = this.options;
+-        let idx = 0;
+-        while (idx < count && getItemKey(idx) !== anchorKey) {
+-          idx++;
+-        }
+-        if (idx < count) {
++        const indexByKey = new Map();
++        for (let i = 0; i < count; i++) indexByKey.set(getItemKey(i), i);
++        for (const [anchorKey, anchorOffset] of anchors) {
++          const idx = indexByKey.get(anchorKey);
++          if (idx === void 0) continue;
+           const anchorItem = newMeasurements[idx];
+-          if (anchorItem) {
+-            const newOffset = Math.max(0, anchorItem.start + anchorOffset);
+-            if (!followOnAppend && newOffset !== this.scrollOffset) {
+-              anchorDelta = newOffset - this.scrollOffset;
+-              this.scrollOffset = newOffset;
+-            }
++          if (!anchorItem) continue;
++          const newOffset = Math.max(0, anchorItem.start + anchorOffset);
++          if (!followOnAppend && newOffset !== this.scrollOffset) {
++            anchorDelta = newOffset - this.scrollOffset;
++            this.scrollOffset = newOffset;
+           }
++          break;
+         }
+       }
+       if (followOnAppend) {
+diff --git a/dist/esm/ios-gesture.js b/dist/esm/ios-gesture.js
+index 8e103b257d0dbe2069b35c300824d9628540d898..356454e6a08c3bb67a590db8620aa828338497fc 100644
+--- a/dist/esm/ios-gesture.js
++++ b/dist/esm/ios-gesture.js
+@@ -76,23 +76,31 @@ class IosGesture {
+       this._touch = null;
+     };
+     this.listen = (target) => {
+-      const onTouchStart = () => this.touchStart();
+-      const onTouchEnd = () => this.touchEnd();
++      let touchTarget = null;
++      const clearTouchTarget = () => {
++        touchTarget?.removeEventListener("touchend", onTouchEnd, touchListenerOptions);
++        touchTarget?.removeEventListener("touchcancel", onTouchEnd, touchListenerOptions);
++        touchTarget = null;
++      };
++      const onTouchEnd = () => {
++        clearTouchTarget();
++        this.touchEnd();
++      };
++      const onTouchStart = (event) => {
++        clearTouchTarget();
++        touchTarget = event.target ?? target;
++        touchTarget.addEventListener("touchend", onTouchEnd, touchListenerOptions);
++        touchTarget.addEventListener("touchcancel", onTouchEnd, touchListenerOptions);
++        this.touchStart();
++      };
+       target.addEventListener("touchstart", onTouchStart, touchListenerOptions);
+-      target.addEventListener("touchend", onTouchEnd, touchListenerOptions);
+-      target.addEventListener("touchcancel", onTouchEnd, touchListenerOptions);
+       return () => {
+         target.removeEventListener(
+           "touchstart",
+           onTouchStart,
+           touchListenerOptions
+         );
+-        target.removeEventListener("touchend", onTouchEnd, touchListenerOptions);
+-        target.removeEventListener(
+-          "touchcancel",
+-          onTouchEnd,
+-          touchListenerOptions
+-        );
++        clearTouchTarget();
+         this.end();
+       };
+     };
+diff --git a/src/index.ts b/src/index.ts
+index ecaaddf7f49f3026ac7d832893d19c3db784a65f..b53ab13f82b3e464e2b71501eab685bc5461270b 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -819,7 +819,7 @@ export class Virtualizer<
+     const prevOptions = this.options as
+       | Required<VirtualizerOptions<TScrollElement, TItemElement>>
+       | undefined
+-    let anchor: [Key, number] | null = null
++    let anchors: Array<[Key, number]> | null = null
+     let followOnAppend: ScrollBehavior | null = null
+     let edgeKeysChanged = false
+ 
+@@ -855,7 +855,15 @@ export class Virtualizer<
+             : null
+ 
+         if (item) {
+-          anchor = [item.key, this.getScrollOffset() - item.start]
++          // A partial turn can regroup when its parent arrives. Keep candidates
++          // below a replaced anchor so a surviving row can hold its position.
++          anchors = []
++          const offset = this.getScrollOffset()
++          for (let index = item.index; index < prevCount && anchors.length < 100; index++) {
++            const candidate = measurements[index]
++            if (!candidate) break
++            anchors.push([candidate.key, offset - candidate.start])
++          }
+         }
+ 
+         const behavior =
+@@ -910,31 +918,30 @@ export class Virtualizer<
+     // command lands where it was written (#1307, step 5).
+     let anchorDelta: number | null = null
+     if (
+-      anchor &&
++      anchors?.length &&
+       this.scrollOffset !== null &&
+       !this._awaitingCommandReadBack()
+     ) {
+-      const [anchorKey, anchorOffset] = anchor
+       const newMeasurements = this.getMeasurements()
+       const { count, getItemKey } = this.options
+-      let idx = 0
+-      while (idx < count && getItemKey(idx) !== anchorKey) {
+-        idx++
+-      }
+-      if (idx < count) {
++      const indexByKey = new Map<Key, number>()
++      for (let i = 0; i < count; i++) indexByKey.set(getItemKey(i), i)
++      for (const [anchorKey, anchorOffset] of anchors) {
++        const idx = indexByKey.get(anchorKey)
++        if (idx === undefined) continue
+         const anchorItem = newMeasurements[idx]
+-        if (anchorItem) {
+-          // Clamp to the reachable range's lower bound — anchorOffset may
+-          // have been derived from a transiently negative scrollOffset
+-          // (rubber-band), and a negative tracked offset never self-heals
+-          // when the element cannot scroll (#1229).
+-          const newOffset = Math.max(0, anchorItem.start + anchorOffset)
+-          // A no-op end scroll emits no event to correct a reading-anchor offset.
+-          if (!followOnAppend && newOffset !== this.scrollOffset) {
+-            anchorDelta = newOffset - this.scrollOffset
+-            this.scrollOffset = newOffset
+-          }
++        if (!anchorItem) continue
++        // Clamp to the reachable range's lower bound — anchorOffset may
++        // have been derived from a transiently negative scrollOffset
++        // (rubber-band), and a negative tracked offset never self-heals
++        // when the element cannot scroll (#1229).
++        const newOffset = Math.max(0, anchorItem.start + anchorOffset)
++        // A no-op end scroll emits no event to correct a reading-anchor offset.
++        if (!followOnAppend && newOffset !== this.scrollOffset) {
++          anchorDelta = newOffset - this.scrollOffset
++          this.scrollOffset = newOffset
+         }
++        break
+       }
+     }
+ 
+diff --git a/src/ios-gesture.ts b/src/ios-gesture.ts
+index cda397d4a538936a18d2e70f7a5bf4c8a61950a1..915637f93242c164118cc179154a508849159d97 100644
+--- a/src/ios-gesture.ts
++++ b/src/ios-gesture.ts
+@@ -192,25 +192,32 @@ export class IosGesture {
+   // passive and cheap, and on non-touch devices they never fire. The gating
+   // by `isIOSWebKit()` lives where a write is decided.
+   listen = (target: EventTarget) => {
+-    const onTouchStart = () => this.touchStart()
+-    const onTouchEnd = () => this.touchEnd()
++    let touchTarget: EventTarget | null = null
++    const clearTouchTarget = () => {
++      touchTarget?.removeEventListener('touchend', onTouchEnd, touchListenerOptions)
++      touchTarget?.removeEventListener('touchcancel', onTouchEnd, touchListenerOptions)
++      touchTarget = null
++    }
++    const onTouchEnd = () => {
++      clearTouchTarget()
++      this.touchEnd()
++    }
++    const onTouchStart = (event: Event) => {
++      clearTouchTarget()
++      // Virtualization may detach the original target before it receives release.
++      touchTarget = event.target ?? target
++      touchTarget.addEventListener('touchend', onTouchEnd, touchListenerOptions)
++      touchTarget.addEventListener('touchcancel', onTouchEnd, touchListenerOptions)
++      this.touchStart()
++    }
+     target.addEventListener('touchstart', onTouchStart, touchListenerOptions)
+-    target.addEventListener('touchend', onTouchEnd, touchListenerOptions)
+-    // Same handler as touchend: iOS can end a touch with touchcancel (system
+-    // gesture, interrupted scroll) and never fire touchend.
+-    target.addEventListener('touchcancel', onTouchEnd, touchListenerOptions)
+     return () => {
+       target.removeEventListener(
+         'touchstart',
+         onTouchStart,
+         touchListenerOptions,
+       )
+-      target.removeEventListener('touchend', onTouchEnd, touchListenerOptions)
+-      target.removeEventListener(
+-        'touchcancel',
+-        onTouchEnd,
+-        touchListenerOptions,
+-      )
++      clearTouchTarget()
+       this.end()
+     }
+   }

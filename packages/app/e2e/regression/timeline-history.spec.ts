@@ -239,6 +239,73 @@ test.describe("timeline history", () => {
     await expect.poll(positions).toEqual(before)
   })
 
+  test("keeps the next answer fixed when older history replaces the interrupted-turn divider", async ({ page }) => {
+    const older = Promise.withResolvers<void>()
+    const parent = userMessage([textPart("prt_rekey_prompt", "Resume the interrupted task")], {
+      id: "msg_rekey_parent",
+      created: 3_000,
+    })
+    const interrupted = assistantMessage([textPart("prt_rekey_interrupted", "Before interruption.")], {
+      id: "msg_rekey_interrupted",
+      parentID: parent.id,
+      created: 4_000,
+      error: { type: "MessageAbortedError", message: "Stopped" },
+    })
+    const messages = [
+      userMessage([textPart("prt_rekey_older_prompt", "Earlier task")], { created: 1_000 }),
+      assistantMessage([textPart("prt_rekey_older", "Earlier output.\n\n".repeat(30))], {
+        id: "msg_rekey_older",
+        created: 2_000,
+      }),
+      parent,
+      interrupted,
+      assistantMessage(
+        [
+          textPart(
+            "prt_rekey_reading",
+            Array.from({ length: 35 }, (_, index) => `Resumed answer ${index}.`).join("\n\n"),
+          ),
+        ],
+        { id: "msg_rekey_reading", parentID: parent.id, created: 5_000 },
+      ),
+    ]
+    await setupTimeline(page, {
+      messages,
+      beforeMessagesResponse: ({ before }) => (before ? older.promise : Promise.resolve()),
+      pageMessages: (_, _limit, before) =>
+        before ? { items: messages.slice(0, 3) } : { items: messages.slice(3), cursor: interrupted.id },
+    })
+    const scroller = timelineScroller(page)
+    await expect(scroller.locator("[data-timeline-virtual-content]")).toBeVisible()
+    await page.evaluate(() => document.fonts.ready)
+    await scroller.evaluate((element) => {
+      element.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: -1 }))
+      element.scrollTop = 0
+    })
+    const divider = scroller.locator(`[data-timeline-key="turn-divider:${interrupted.id}"]`)
+    const anchor = scroller.getByText("Resumed answer 0.", { exact: true })
+    await expect(divider).toBeInViewport()
+    await expect(anchor).toBeInViewport()
+    await divider.evaluate((element) => {
+      const viewport = element.closest("[data-scrollable]")!
+      const box = element.getBoundingClientRect()
+      viewport.scrollTop += box.top + box.height / 2 - viewport.getBoundingClientRect().top
+    })
+    const top = () => anchor.evaluate((element) => Math.round(element.getBoundingClientRect().top))
+    const before = await top()
+    expect(
+      await divider.evaluate((element) => {
+        const top = element.closest("[data-scrollable]")!.getBoundingClientRect().top
+        const box = element.getBoundingClientRect()
+        return box.top < top && box.bottom > top
+      }),
+    ).toBe(true)
+
+    older.resolve()
+    await expect(scroller.locator(`[data-timeline-key="turn-divider:${parent.id}"]`)).toBeAttached()
+    await expect.poll(top).toBe(before)
+  })
+
   test("mounts every part once and in order while paging to the start", async ({ page }) => {
     test.setTimeout(240_000)
     const errors = trackPageErrors(page)
