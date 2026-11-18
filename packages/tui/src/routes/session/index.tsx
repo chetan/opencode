@@ -90,6 +90,7 @@ import { deduplicateVisibleImages } from "../../prompt/attachment"
 import { useEpilogue } from "../../context/epilogue"
 import { normalizePath } from "../../util/path"
 import { PermissionPrompt } from "./permission"
+import { ShellCode } from "../../component/shell-code"
 import { FormPrompt } from "./form"
 import { DialogExportOptions } from "../../ui/dialog-export-options"
 import { DialogExportResult } from "../../ui/dialog-export-result"
@@ -3142,13 +3143,23 @@ function ShellDisplay(props: {
           <Show
             when={isRunning()}
             fallback={
-              <text
-                fg={theme.text.base}
-                wrapMode={expanded() ? "word" : "char"}
-                maxHeight={expanded() ? undefined : 2}
+              <Show
+                when={expanded() && props.command}
+                fallback={
+                  <text fg={theme.text.base} wrapMode="char" maxHeight={2}>
+                    {limitedInput()}
+                  </text>
+                }
               >
-                {limitedInput()}
-              </text>
+                {(command) => (
+                  <box flexDirection="column">
+                    <Show when={workdir() && workdir() !== "." ? workdir() : undefined}>
+                      {(directory) => <text fg={theme.text.muted}>{directory()}</text>}
+                    </Show>
+                    <ShellCode text={command()} />
+                  </box>
+                )}
+              </Show>
             }
           >
             <box flexDirection="row" gap={1}>
@@ -3247,7 +3258,9 @@ function Read(props: ToolProps) {
         Read {pathFormatter.format(stringValue(props.input.path))}
         <Show when={props.input.offset !== undefined || props.input.limit !== undefined}>
           :{finiteNumber(props.input.offset) || 1}-
-          {props.input.limit ? (finiteNumber(props.input.offset) || 1) + (finiteNumber(props.input.limit) || 0) - 1 : ""}
+          {props.input.limit
+            ? (finiteNumber(props.input.offset) || 1) + (finiteNumber(props.input.limit) || 0) - 1
+            : ""}
         </Show>
       </InlineTool>
       <For each={loaded()}>

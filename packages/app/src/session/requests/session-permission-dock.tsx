@@ -1,8 +1,11 @@
 import { Option, Schema } from "effect"
-import { For, Show } from "solid-js"
+import { createSignal, For, Show } from "solid-js"
 import type { PermissionRequest } from "@opencode/client/promise"
 import { Button } from "@opencode/ui/button"
 import { DockPrompt } from "@opencode/session-ui/dock-prompt"
+import { ShellCode } from "@opencode/session-ui/shell-code"
+import { createCopyFeedback } from "@opencode/session-ui/copy"
+import { isShellResource } from "@opencode/util/shell-preview"
 import { Icon } from "@opencode/ui/icon"
 import { useLanguage } from "@/runtime/i18n/language"
 
@@ -16,6 +19,8 @@ export function SessionPermissionDock(props: {
   onDecide: (response: "once" | "always" | "reject") => void
 }) {
   const language = useLanguage()
+  const [original, setOriginal] = createSignal<string>()
+  const copy = createCopyFeedback()
 
   const toolDescription = () => {
     const key = `settings.permissions.tool.${props.request.action}.description`
@@ -94,11 +99,39 @@ export function SessionPermissionDock(props: {
       </Show>
 
       <Show when={props.request.resources.length > 0}>
-        <div data-slot="permission-row">
+        <div data-slot="permission-row" data-variant="resources">
           <span data-slot="permission-spacer" aria-hidden="true" />
-          <div data-slot="permission-patterns">
+          <div data-slot="permission-patterns" data-scrollable>
             <For each={props.request.resources}>
-              {(pattern) => <code class="text-text-base break-all">{pattern}</code>}
+              {(pattern) => {
+                const formatted = () =>
+                  props.request.resources.length === 1 && isString(props.request.metadata?.formattedCommand)
+                    ? props.request.metadata.formattedCommand
+                    : undefined
+                return (
+                  <Show when={isShellResource(props.request, pattern)} fallback={<code dir="ltr">{pattern}</code>}>
+                    <Show when={formatted()}>
+                      <div>
+                        <Button
+                          variant="ghost"
+                          size="small"
+                          onClick={() => setOriginal(original() === props.request.id ? undefined : props.request.id)}
+                        >
+                          {language.t(
+                            original() === props.request.id
+                              ? "ui.permission.showFormatted"
+                              : "ui.permission.showOriginal",
+                          )}
+                        </Button>
+                        <Button variant="ghost" size="small" onClick={() => copy.copy(pattern)}>
+                          {language.t(copy.copied() ? "ui.message.copied" : "ui.permission.copyOriginal")}
+                        </Button>
+                      </div>
+                    </Show>
+                    <ShellCode text={original() === props.request.id ? pattern : (formatted() ?? pattern)} />
+                  </Show>
+                )
+              }}
             </For>
           </div>
         </div>

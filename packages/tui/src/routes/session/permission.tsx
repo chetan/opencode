@@ -4,6 +4,8 @@ import { Portal, useRenderer, useTerminalDimensions, type JSX } from "@opentui/s
 import type { TextareaRenderable } from "@opentui/core"
 import { useTheme, useThemes } from "../../context/theme"
 import type { PermissionReply, PermissionRequest } from "@opencode/client"
+import { isShellResource } from "@opencode/util/shell-preview"
+import { ShellCode } from "../../component/shell-code"
 import { SplitBorder } from "../../ui/border"
 import { useData } from "../../context/data"
 import { filetype } from "../../util/filetype"
@@ -115,6 +117,7 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
   const toast = useToast()
   const [store, setStore] = createStore({
     stage: "permission" as PermissionStage,
+    original: undefined as string | undefined,
   })
   const pathFormatter = usePathFormatter()
   const session = createMemo(() => data.session.get(props.request.sessionID))
@@ -132,6 +135,29 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
   })
 
   const theme = useTheme()
+  const commands = createMemo(() =>
+    props.request.resources.filter((resource) => isShellResource(props.request, resource)),
+  )
+  const formatted = () =>
+    commands().length === 1 && typeof props.request.metadata?.formattedCommand === "string"
+      ? props.request.metadata.formattedCommand
+      : undefined
+  const original = () => store.original === props.request.id
+
+  Keymap.createLayer(() => ({
+    mode: "base",
+    commands:
+      formatted() && store.stage === "permission"
+        ? [
+            {
+              bind: "o",
+              title: "Toggle original command",
+              group: "Permission",
+              run: () => setStore("original", original() ? undefined : props.request.id),
+            },
+          ]
+        : [],
+  }))
 
   function reply(value: PermissionReply, message?: string) {
     void data.session.permission
@@ -177,6 +203,18 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
                   </box>
                 </box>
               </Show>
+            ) : commands().length ? (
+              <box paddingLeft={1}>
+                <Show when={props.request.message && props.request.action !== "shell"}>
+                  <text fg={theme.text.muted}>{props.request.message}</text>
+                </Show>
+                <Show when={formatted()}>
+                  <text fg={theme.text.muted}>{original() ? "[o] Show formatted" : "[o] Show original"}</text>
+                </Show>
+                <For each={commands()}>
+                  {(command) => <ShellCode text={original() ? command : (formatted() ?? command)} />}
+                </For>
+              </box>
             ) : (
               <box paddingLeft={1}>
                 <For each={current.lines}>

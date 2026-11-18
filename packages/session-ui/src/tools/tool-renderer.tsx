@@ -33,6 +33,7 @@ import { Icon } from "@opencode/ui/icon"
 import { ToolErrorCard } from "../components/tool-error-card"
 import { DiffChanges } from "@opencode/ui/diff-changes"
 import { Markdown } from "../components/markdown"
+import { ShellCode } from "../components/shell-code"
 import { createMarkdownImages } from "../components/markdown-image"
 import { createImagePreview } from "../components/image-preview"
 import { useMarkdown } from "../context/markdown"
@@ -1896,7 +1897,7 @@ export function ConsoleOutput(props: { command?: string; output: string }) {
             <div data-slot="bash-command">
               <ConsoleCopy text={command()} label={i18n.t("ui.message.copy")} />
               <pre data-slot="bash-pre">
-                <code>{command()}</code>
+                <ShellCode text={command()} />
               </pre>
             </div>
           )}
