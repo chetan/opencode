@@ -82,6 +82,7 @@ export function createSessionTimelineInteraction(session: SessionModel, visible:
   const oldestMessage = createMemo(() => timeline.messages()[0]?.id)
   const visibleUserMessages = timeline.visibleUserMessages
   const anchor = (id: string) => `message-${id}`
+  let readTimelineOffset: (() => number) | undefined
 
   // The prompt at the top of the view, or the last chosen one when no prompt header is mounted there.
   const promptInView = () => {
@@ -229,8 +230,9 @@ export function createSessionTimelineInteraction(session: SessionModel, visible:
     cursor.dispatch(SCROLL_MOVED_EVENT)
   }
 
-  const setScrollRef = (element: HTMLDivElement | undefined) => {
+  const setScrollRef = (element: HTMLDivElement | undefined, readOffset: () => number) => {
     scroller = element
+    readTimelineOffset = element ? readOffset : undefined
     setState("refs", "scroller", element)
 
     if (!element) return
@@ -240,8 +242,8 @@ export function createSessionTimelineInteraction(session: SessionModel, visible:
 
   const onHistoryScroll = () => {
     if (
-      !scroller ||
-      scroller.scrollTop >= HISTORY_SCROLL_THRESHOLD ||
+      !readTimelineOffset ||
+      readTimelineOffset() >= HISTORY_SCROLL_THRESHOLD ||
       !canRequestScrollPage(untrack(historyState)) ||
       untrack(follow.following)
     )
@@ -276,7 +278,7 @@ export function createSessionTimelineInteraction(session: SessionModel, visible:
             !!scroller &&
             (effect.probe === "fill"
               ? follow.following() && scroller.scrollHeight <= scroller.clientHeight + 1
-              : !follow.following() && scroller.scrollTop < HISTORY_SCROLL_THRESHOLD)
+              : !follow.following() && !!readTimelineOffset && readTimelineOffset() < HISTORY_SCROLL_THRESHOLD)
         },
         () => {
           historyProbe = undefined
