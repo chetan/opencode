@@ -3,6 +3,7 @@
 import { codeToTokens, isSupportedLanguage, LiveTokenizer, type ThemedToken } from "@pierre/highlights"
 import { createMarkdownParser } from "@opencode/ui/context/marked-parser"
 import { OpenCodeTheme } from "@opencode/ui/context/highlight-theme"
+import { shellSegments } from "@opencode/util/shell-preview"
 import {
   diffProjectionBlocks,
   type MarkdownToken,
@@ -87,7 +88,7 @@ function highlight(request: Extract<MarkdownWorkerRequest, { type: "highlight" }
     const lang = isSupportedLanguage(language) ? language : "text"
 
     if (request.complete) {
-      const result = codeToTokens(request.text, { lang, theme: OpenCodeTheme })
+      const segments = lang === "bash" ? shellSegments(request.text) : [{ text: request.text, language: lang }]
       closeStream(request.key)
       post({
         type: "highlight",
@@ -95,11 +96,16 @@ function highlight(request: Extract<MarkdownWorkerRequest, { type: "highlight" }
         key: request.key,
         language,
         reset: true,
-        stable: result.tokens
-          .flatMap((line, index) =>
-            index === result.tokens.length - 1 ? line : [...line, { content: "\n", offset: 0 }],
-          )
-          .map(token),
+        stable: segments.flatMap((segment) => {
+          const lang = isSupportedLanguage(segment.language) ? segment.language : "text"
+          const result = codeToTokens(segment.text, { lang, theme: OpenCodeTheme })
+
+          return result.tokens
+            .flatMap((line, index) =>
+              index === result.tokens.length - 1 ? line : [...line, { content: "\n", offset: 0 }],
+            )
+            .map(token)
+        }),
         unstable: [],
       })
 

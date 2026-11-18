@@ -2623,6 +2623,7 @@ export type ConfigEntry =
           portable_shell_scanner?: boolean
           codemode_vm?: boolean
           all_flags?: boolean
+          permission_command_format?: boolean
           todo?: boolean
           media_blob?: boolean
           automations?: boolean
