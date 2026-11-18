@@ -13,6 +13,9 @@ import { SessionStore } from "./session/store.js"
 import { Wildcard } from "./util/wildcard.js"
 import { PermissionSaved } from "./permission/saved.js"
 import { PluginHooks } from "./plugin/hooks.js"
+import { Flag } from "./flag.js"
+import { isShellResource } from "@opencode/util/shell-preview"
+import { formatPermissionCommand } from "./permission/shell-preview.js"
 
 const PermissionEffect = Permission.Effect
 export { PermissionEffect as Effect }
@@ -154,6 +157,7 @@ const layer = Layer.effect(
     const sessions = yield* SessionStore.Service
     const saved = yield* PermissionSaved.Service
     const hooks = yield* PluginHooks.Service
+    const flags = yield* Flag.Service
     const pending = new Map<ID, Pending>()
     const parents = new Map<string, Tool.CallID>()
     let closed = false
@@ -237,7 +241,12 @@ const layer = Layer.effect(
       }
     })
 
-    function request(input: AssertInput, message?: string): Request {
+    const request = Effect.fnUntraced(function* (input: AssertInput, message?: string) {
+      const command = input.resources.length === 1 ? input.resources[0] : undefined
+      const formatted =
+        command?.includes("<<") && isShellResource(input, command) && (yield* flags.enabled("permission_command_format"))
+          ? yield* formatPermissionCommand(command)
+          : undefined
       return {
         id: input.id ?? ID.create(),
         sessionID: input.sessionID,
@@ -247,12 +256,20 @@ const layer = Layer.effect(
         // Tools copy optional inputs straight into metadata; undefined values are not JSON and would
         // fail the HttpApi response encoder when clients list pending requests.
         metadata:
-          input.metadata &&
-          Object.fromEntries(Object.entries(input.metadata).filter(([, value]) => value !== undefined)),
+          input.metadata || formatted
+            ? {
+                ...Object.fromEntries(
+                  Object.entries(input.metadata ?? {}).filter(
+                    ([key, value]) => key !== "formattedCommand" && value !== undefined,
+                  ),
+                ),
+                ...(formatted ? { formattedCommand: formatted } : {}),
+              }
+            : undefined,
         source: row(input.source),
         message,
-      }
-    }
+      } satisfies Request
+    })
 
     const create = (request: Request, agent?: Agent.ID) =>
       Effect.uninterruptible(
@@ -276,8 +293,9 @@ const layer = Layer.effect(
     const ask = Effect.fn("Permission.ask")(function* (input: AssertInput) {
       if (closed) return { id: input.id ?? ID.create(), effect: "deny" as const }
       const result = yield* evaluateInput(input)
-      const value = request(input, result.message)
-      if (result.effect === "ask") yield* create(value, input.agent)
+      if (result.effect !== "ask") return { id: input.id ?? ID.create(), effect: result.effect }
+      const value = yield* request(input, result.message)
+      yield* create(value, input.agent)
       return { id: value.id, effect: result.effect }
     })
 
@@ -296,7 +314,8 @@ const layer = Layer.effect(
               })
             }
             if (result.effect === "allow") return
-            const item = yield* create(request(input, result.message), input.agent)
+            const value = yield* restore(request(input, result.message))
+            const item = yield* create(value, input.agent)
             return yield* restore(Deferred.await(item.deferred)).pipe(
               // Deliberate defect tunnel: leaves wrap execution in blanket `mapError`, which
               // must not convert a user's decline into model-facing tool output. The decline
@@ -413,5 +432,5 @@ const layer = Layer.effect(
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [Bus.node, Location.node, Agent.node, SessionStore.node, PermissionSaved.node, PluginHooks.node],
+  deps: [Bus.node, Location.node, Agent.node, SessionStore.node, PermissionSaved.node, PluginHooks.node, Flag.node],
 })
