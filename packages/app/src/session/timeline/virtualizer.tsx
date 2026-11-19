@@ -505,7 +505,10 @@ export function createTimelineVirtualizer(input: Input) {
       ? item.end <= (instance.scrollOffset ?? 0) + instance.scrollAdjustments + instance.options.scrollMargin
       : first !== undefined && item.index < first
 
-    if (!defersAdjustments(input.follow.peek())) return adjust
+    // A prepend held by TanStack has already shifted the coordinate system.
+    // Let it absorb these size corrections too: writing a separate delta into
+    // the old native range can clamp it at the top and move the reader.
+    if (instance.heldScrollOffset || !defersAdjustments(input.follow.peek())) return adjust
 
     // iOS defers native scroll writes until momentum ends. Keep the same visual
     // anchor now, rather than moving rows now and snapping the viewport back later.
@@ -999,6 +1002,7 @@ export function createTimelineVirtualizer(input: Input) {
 
     if (!active()) return
     input.follow.dispatch(virtualizer.isScrolling ? touchMomentumEvent : touchEndEvent)
+    virtualizer.flushHeldScrollAtStart()
 
     if (!virtualizer.isScrolling) flushTouchAdjustment()
   }

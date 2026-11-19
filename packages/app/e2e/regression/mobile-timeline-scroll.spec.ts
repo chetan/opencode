@@ -43,7 +43,9 @@ for (const device of ["Pixel 7", "iPhone 13"]) {
             [
               textPart(
                 `prt_prepend_reply_${index}`,
-                Array.from({ length: 24 }, (_, line) => `Reply ${index} line ${line}.`).join("\n\n"),
+                Array.from({ length: index === 5 ? 120 : 24 }, (_, line) => `Reply ${index} line ${line}.`).join(
+                  "\n\n",
+                ),
               ),
             ],
             { id: `msg_prepend_${index}b`, parentID: `msg_prepend_${index}a`, created: index * 2 + 2 },
@@ -95,13 +97,40 @@ for (const device of ["Pixel 7", "iPhone 13"]) {
         await expect(anchor).toBeInViewport()
         expect(await position()).toBeCloseTo(before, 0)
 
+        // Once a held gesture hits the native boundary, lifting the finger
+        // should expose the loaded range without a snap or a dead next swipe.
+        const toStart = await scroller.evaluate((element) => element.scrollTop)
+        await devtools.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x: point.x, y: point.y + 340 }],
+          timestamp: restingTimestamp(),
+        })
+        await expect(scroller).toHaveJSProperty("scrollTop", 0)
+        const atStart = await position()
+        expect(atStart).toBeCloseTo(before + toStart, 0)
+
         await devtools.send("Input.dispatchTouchEvent", {
           type: "touchEnd",
           touchPoints: [],
           timestamp: Date.now() / 1000,
         })
-        await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(200)
-        expect(await position()).toBeCloseTo(before, 0)
+        expect(await position()).toBeCloseTo(atStart, 0)
+        await devtools.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [point],
+          timestamp: restingTimestamp(),
+        })
+        await devtools.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x: point.x, y: point.y + 120 }],
+          timestamp: restingTimestamp(),
+        })
+        await expect.poll(position).toBeGreaterThan(atStart + 80)
+        await devtools.send("Input.dispatchTouchEvent", {
+          type: "touchEnd",
+          touchPoints: [],
+          timestamp: Date.now() / 1000,
+        })
         expect(requests).toEqual(["older"])
       })
 
