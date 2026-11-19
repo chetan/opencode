@@ -254,7 +254,6 @@ export function createTimelineVirtualizer(input: Input) {
   const measuredElements = new WeakSet<Element>()
   // The finger's last position, a measurement only: whether it is down is the follow machine's `isTouchHeld`.
   let lastTouchY = 0
-  let lastTouchTop = 0
   let touchTarget: EventTarget | null = null
   // Size compensation deferred during one resize delivery, committed or dropped before the delivery ends.
   let touchAdjustment = 0
@@ -963,7 +962,6 @@ export function createTimelineVirtualizer(input: Input) {
     input.onUserScroll(event.target)
     lastTouchY = touch.clientY
     const root = listRoot()
-    lastTouchTop = root?.scrollTop ?? 0
     const nested = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-scrollable]") : null
 
     input.follow.dispatch(
@@ -986,9 +984,6 @@ export function createTimelineVirtualizer(input: Input) {
     if (current === undefined) return
     const previous = lastTouchY
     lastTouchY = current
-    const root = listRoot()
-    const previousTop = lastTouchTop
-    lastTouchTop = root?.scrollTop ?? 0
 
     // A retained target can outlive its whole session view. Only the active timeline may change the shared follow
     // state, and only while the finger it started with is still down; release still cleans up below.
@@ -996,18 +991,9 @@ export function createTimelineVirtualizer(input: Input) {
 
     // Dragging the content downward reveals earlier messages.
     if (current <= previous) return
+    const root = listRoot()
     touchDragEvent.overflow = !!root && root.scrollHeight - root.clientHeight > MIN_OVERFLOW
     input.follow.dispatch(touchDragEvent)
-    const state = input.follow.peek()
-    // The move that first reaches zero was already handled by the compositor.
-    if (
-      previousTop === 0 &&
-      event.touches.length === 1 &&
-      state.type === "detached" &&
-      state.gesture === "touch" &&
-      virtualizer.dragHeldScrollAtStart(current - previous)
-    )
-      input.onHistoryScroll()
   }
 
   const handleListTouchEnd = () => {

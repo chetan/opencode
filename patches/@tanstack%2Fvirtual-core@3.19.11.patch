@@ -1,5 +1,5 @@
 diff --git a/dist/cjs/index.cjs b/dist/cjs/index.cjs
-index e08c978a8870d1560c13e30abc3a818823001f0c..b32e16502cdd95e4a83d3535f39dcb4ee580e95a 100644
+index e08c978a8870d1560c13e30abc3a818823001f0c..5145462bea30eea675d855dfa232a8d332c1ce0b 100644
 --- a/dist/cjs/index.cjs
 +++ b/dist/cjs/index.cjs
 @@ -392,7 +392,7 @@ class Virtualizer {
@@ -62,17 +62,10 @@ index e08c978a8870d1560c13e30abc3a818823001f0c..b32e16502cdd95e4a83d3535f39dcb4e
          }
        }
        if (followOnAppend) {
-@@ -460,6 +465,18 @@ class Virtualizer {
+@@ -460,6 +465,11 @@ class Virtualizer {
          }
        }
      };
-+    this.dragHeldScrollAtStart = (distance) => {
-+      if (distance <= 0 || this._holdOffset <= 0 || this.scrollState || !this._iosGesture.dragging() || this._readElementOffset() !== 0) return false;
-+      this._holdOffset -= Math.min(distance, this._holdOffset);
-+      this.scrollOffset = this._toLayoutOffset(0);
-+      this.notify(true);
-+      return true;
-+    };
 +    this.flushHeldScrollAtStart = () => {
 +      if (this._holdOffset <= 0 || this._reportedOverscroll || this.scrollState || this._readElementOffset() !== 0) return;
 +      this._iosGesture.end();
@@ -81,7 +74,7 @@ index e08c978a8870d1560c13e30abc3a818823001f0c..b32e16502cdd95e4a83d3535f39dcb4e
      this.notify = (sync) => {
        var _a, _b;
        (_b = (_a = this.options).onChange) == null ? void 0 : _b.call(_a, this, sync);
-@@ -1424,6 +1441,9 @@ class Virtualizer {
+@@ -1424,6 +1434,9 @@ class Virtualizer {
    get scrollAdjustments() {
      return 0;
    }
@@ -92,15 +85,14 @@ index e08c978a8870d1560c13e30abc3a818823001f0c..b32e16502cdd95e4a83d3535f39dcb4e
    // tick, `false` when the delta was zero or the write was deferred (iOS).
    // `resizeItem` uses that to decide whether the follow-up `notify` must be
 diff --git a/dist/cjs/index.d.cts b/dist/cjs/index.d.cts
-index f80c509b63deeff684f3b734c3170c536f21c9be..eb943945ab3ada0992efa6e44a61371735ed3a33 100644
+index f80c509b63deeff684f3b734c3170c536f21c9be..71b570caea91f95f7fd444c096c9bb5b891c5e20 100644
 --- a/dist/cjs/index.d.cts
 +++ b/dist/cjs/index.d.cts
-@@ -126,6 +126,9 @@ export declare class Virtualizer<TScrollElement extends Element | Window, TItemE
+@@ -126,6 +126,8 @@ export declare class Virtualizer<TScrollElement extends Element | Window, TItemE
       * `scrollOffset` alone.
       */
      get scrollAdjustments(): number;
 +    get heldScrollOffset(): number;
-+    dragHeldScrollAtStart: (distance: number) => boolean;
 +    flushHeldScrollAtStart: () => void;
      private _holdOffset;
      private _reportedOverscroll;
@@ -152,21 +144,20 @@ index 9b76f2349e8c90d4171853fb9a947fbd3134941b..2971af9e1f8ce07f57d513c8c010516c
        };
      };
 diff --git a/dist/esm/index.d.ts b/dist/esm/index.d.ts
-index 0524d9ab25900f069b0ab802a1c7f82b98049968..01a060e7b3a3d602972f198c807dd14b7a628f4e 100644
+index 0524d9ab25900f069b0ab802a1c7f82b98049968..9d8fc2e6b27e7a1f961b15e746b9469f09a426d2 100644
 --- a/dist/esm/index.d.ts
 +++ b/dist/esm/index.d.ts
-@@ -126,6 +126,9 @@ export declare class Virtualizer<TScrollElement extends Element | Window, TItemE
+@@ -126,6 +126,8 @@ export declare class Virtualizer<TScrollElement extends Element | Window, TItemE
       * `scrollOffset` alone.
       */
      get scrollAdjustments(): number;
 +    get heldScrollOffset(): number;
-+    dragHeldScrollAtStart: (distance: number) => boolean;
 +    flushHeldScrollAtStart: () => void;
      private _holdOffset;
      private _reportedOverscroll;
      private _iosGesture;
 diff --git a/dist/esm/index.js b/dist/esm/index.js
-index abe4b4906a110b39d76eb8926db4af5683acc1d2..6ef5a6e3e0841623ccac73fbce049d87951614f5 100644
+index abe4b4906a110b39d76eb8926db4af5683acc1d2..98b8425f54399c0da8cc9c5681b595b1bd953dc2 100644
 --- a/dist/esm/index.js
 +++ b/dist/esm/index.js
 @@ -391,7 +391,7 @@ class Virtualizer {
@@ -229,17 +220,10 @@ index abe4b4906a110b39d76eb8926db4af5683acc1d2..6ef5a6e3e0841623ccac73fbce049d87
          }
        }
        if (followOnAppend) {
-@@ -459,6 +464,18 @@ class Virtualizer {
+@@ -459,6 +464,11 @@ class Virtualizer {
          }
        }
      };
-+    this.dragHeldScrollAtStart = (distance) => {
-+      if (distance <= 0 || this._holdOffset <= 0 || this.scrollState || !this._iosGesture.dragging() || this._readElementOffset() !== 0) return false;
-+      this._holdOffset -= Math.min(distance, this._holdOffset);
-+      this.scrollOffset = this._toLayoutOffset(0);
-+      this.notify(true);
-+      return true;
-+    };
 +    this.flushHeldScrollAtStart = () => {
 +      if (this._holdOffset <= 0 || this._reportedOverscroll || this.scrollState || this._readElementOffset() !== 0) return;
 +      this._iosGesture.end();
@@ -248,7 +232,7 @@ index abe4b4906a110b39d76eb8926db4af5683acc1d2..6ef5a6e3e0841623ccac73fbce049d87
      this.notify = (sync) => {
        var _a, _b;
        (_b = (_a = this.options).onChange) == null ? void 0 : _b.call(_a, this, sync);
-@@ -1423,6 +1440,9 @@ class Virtualizer {
+@@ -1423,6 +1433,9 @@ class Virtualizer {
    get scrollAdjustments() {
      return 0;
    }
@@ -305,28 +289,16 @@ index 8e103b257d0dbe2069b35c300824d9628540d898..356454e6a08c3bb67a590db8620aa828
        };
      };
 diff --git a/src/index.ts b/src/index.ts
-index ecaaddf7f49f3026ac7d832893d19c3db784a65f..2b88961d2a22c47eea7ac7dde53e6563fd362d8c 100644
+index ecaaddf7f49f3026ac7d832893d19c3db784a65f..53382a76ddbff4589ce56e03a1a507f059b8eec3 100644
 --- a/src/index.ts
 +++ b/src/index.ts
-@@ -521,6 +521,35 @@ export class Virtualizer<
+@@ -521,6 +521,23 @@ export class Virtualizer<
    get scrollAdjustments() {
      return 0
    }
 +
 +  get heldScrollOffset() {
 +    return this._holdOffset
-+  }
-+
-+  // At native zero there are no scroll events for a continued drag. Reveal
-+  // just the requested part of the prepend; leave the remaining hold intact.
-+  dragHeldScrollAtStart = (distance: number) => {
-+    if (distance <= 0 || this._holdOffset <= 0 || this.scrollState ||
-+      !this._iosGesture.dragging() || this._readElementOffset() !== 0) return false
-+    const delta = Math.min(distance, this._holdOffset)
-+    this._holdOffset -= delta
-+    this.scrollOffset = this._toLayoutOffset(0)
-+    this.notify(true)
-+    return true
 +  }
 +
 +  // A released swipe at the native start cannot keep flinging upward. Open
@@ -344,7 +316,7 @@ index ecaaddf7f49f3026ac7d832893d19c3db784a65f..2b88961d2a22c47eea7ac7dde53e6563
    // Scroll corrections (a prepend's anchor delta, size changes above the
    // viewport) that could not be written to the element because a write was
    // impossible at the time (see `_canWriteScroll`): the difference between
-@@ -819,7 +848,7 @@ export class Virtualizer<
+@@ -819,7 +836,7 @@ export class Virtualizer<
      const prevOptions = this.options as
        | Required<VirtualizerOptions<TScrollElement, TItemElement>>
        | undefined
@@ -353,7 +325,7 @@ index ecaaddf7f49f3026ac7d832893d19c3db784a65f..2b88961d2a22c47eea7ac7dde53e6563
      let followOnAppend: ScrollBehavior | null = null
      let edgeKeysChanged = false
  
-@@ -855,7 +884,15 @@ export class Virtualizer<
+@@ -855,7 +872,15 @@ export class Virtualizer<
              : null
  
          if (item) {
@@ -370,7 +342,7 @@ index ecaaddf7f49f3026ac7d832893d19c3db784a65f..2b88961d2a22c47eea7ac7dde53e6563
          }
  
          const behavior =
-@@ -910,31 +947,30 @@ export class Virtualizer<
+@@ -910,31 +935,30 @@ export class Virtualizer<
      // command lands where it was written (#1307, step 5).
      let anchorDelta: number | null = null
      if (

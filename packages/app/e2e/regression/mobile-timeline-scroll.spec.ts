@@ -31,136 +31,108 @@ for (const device of ["Pixel 7", "iPhone 13"]) {
     })
 
     if (device === "iPhone 13")
-      for (const held of [false, true])
-        test(
-          held
-            ? "scrolls into prepended history without lifting the finger"
-            : "keeps the reading position when older history arrives mid-swipe",
-          async ({ page }) => {
-            const older = Promise.withResolvers<void>()
-            const requests: string[] = []
-            const messages = Array.from({ length: 8 }, (_, index) => [
-              userMessage([textPart(`prt_prepend_user_${index}`, `Prompt ${index}`)], {
-                id: `msg_prepend_${index}a`,
-                created: index * 2 + 1,
-              }),
-              assistantMessage(
-                [
-                  textPart(
-                    `prt_prepend_reply_${index}`,
-                    Array.from({ length: index === 5 ? 120 : 24 }, (_, line) => `Reply ${index} line ${line}.`).join(
-                      "\n\n",
-                    ),
-                  ),
-                ],
-                { id: `msg_prepend_${index}b`, parentID: `msg_prepend_${index}a`, created: index * 2 + 2 },
+      test("keeps the reading position when older history arrives mid-swipe", async ({ page }) => {
+        const older = Promise.withResolvers<void>()
+        const requests: string[] = []
+        const messages = Array.from({ length: 8 }, (_, index) => [
+          userMessage([textPart(`prt_prepend_user_${index}`, `Prompt ${index}`)], {
+            id: `msg_prepend_${index}a`,
+            created: index * 2 + 1,
+          }),
+          assistantMessage(
+            [
+              textPart(
+                `prt_prepend_reply_${index}`,
+                Array.from({ length: index === 5 ? 120 : 24 }, (_, line) => `Reply ${index} line ${line}.`).join(
+                  "\n\n",
+                ),
               ),
-            ]).flat()
+            ],
+            { id: `msg_prepend_${index}b`, parentID: `msg_prepend_${index}a`, created: index * 2 + 2 },
+          ),
+        ]).flat()
 
-            await setupTimeline(page, {
-              messages,
-              pageMessages: (_, _limit, before) => {
-                if (before === "oldest") return { items: messages.slice(0, 2) }
-                if (before === "older") return { items: messages.slice(2, 12), cursor: "oldest" }
-                return { items: messages.slice(12), cursor: "older" }
-              },
-              beforeMessagesResponse: ({ before }) => (before ? older.promise : Promise.resolve()),
-              onMessages: ({ before, phase }) => {
-                if (before && phase === "start") requests.push(before)
-              },
-            })
-            const timeline = page.locator('[data-slot="session-timeline-scroll"]')
-            const scroller = timeline.getByRole("region", { name: "scrollable content", exact: true })
-            const anchor = scroller.getByText("Reply 6 line 2.", { exact: true })
-            await expect(timeline.locator("[data-timeline-virtual-content]")).toBeVisible()
-            await page.evaluate(() => document.fonts.ready)
-            await scroller.evaluate((element) => {
-              element.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: -1 }))
-              element.scrollTop = 240
-            })
-            await expect(anchor).toBeInViewport()
-            const bounds = (await scroller.boundingBox())!
-            const devtools = await page.context().newCDPSession(page)
-            const point = { x: bounds.x + 120, y: bounds.y + 150 }
-            await devtools.send("Input.dispatchTouchEvent", {
-              type: "touchStart",
-              touchPoints: [point],
-              timestamp: restingTimestamp(),
-            })
-            await devtools.send("Input.dispatchTouchEvent", {
-              type: "touchMove",
-              touchPoints: [{ x: point.x, y: point.y + 230 }],
-              timestamp: restingTimestamp(),
-            })
-            await expect.poll(() => requests).toEqual(["older"])
-            await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeLessThan(50)
-            const position = () => anchor.evaluate((element) => element.getBoundingClientRect().top)
-            const before = await position()
-
-            older.resolve()
-            await expect(scroller.getByText("Reply 5 line 0.", { exact: true })).toBeAttached()
-            await expect(anchor).toBeInViewport()
-            expect(await position()).toBeCloseTo(before, 0)
-
-            // Once a held gesture hits the native boundary, lifting the finger
-            // should expose the loaded range without a snap or a dead next swipe.
-            const toStart = await scroller.evaluate((element) => element.scrollTop)
-            await devtools.send("Input.dispatchTouchEvent", {
-              type: "touchMove",
-              touchPoints: [{ x: point.x, y: point.y + 340 }],
-              timestamp: restingTimestamp(),
-            })
-            await expect(scroller).toHaveJSProperty("scrollTop", 0)
-            const atStart = await position()
-            expect(atStart).toBeCloseTo(before + toStart, 0)
-
-            if (held) {
-              const previousReply = scroller.getByText("Reply 5 line 117.", { exact: true })
-              await expect(previousReply).not.toBeInViewport()
-              for (const distance of [400, 470, 540]) {
-                await devtools.send("Input.dispatchTouchEvent", {
-                  type: "touchMove",
-                  touchPoints: [{ x: point.x, y: point.y + distance }],
-                  timestamp: restingTimestamp(),
-                })
-              }
-              await expect(previousReply).toBeInViewport()
-              const continued = atStart + 200
-              await expect.poll(position).toBeCloseTo(continued, 0)
-              await devtools.send("Input.dispatchTouchEvent", {
-                type: "touchEnd",
-                touchPoints: [],
-                timestamp: Date.now() / 1000,
-              })
-              expect(await position()).toBeCloseTo(continued, 0)
-              return
-            }
-
-            await devtools.send("Input.dispatchTouchEvent", {
-              type: "touchEnd",
-              touchPoints: [],
-              timestamp: Date.now() / 1000,
-            })
-            expect(await position()).toBeCloseTo(atStart, 0)
-            await devtools.send("Input.dispatchTouchEvent", {
-              type: "touchStart",
-              touchPoints: [point],
-              timestamp: restingTimestamp(),
-            })
-            await devtools.send("Input.dispatchTouchEvent", {
-              type: "touchMove",
-              touchPoints: [{ x: point.x, y: point.y + 120 }],
-              timestamp: restingTimestamp(),
-            })
-            await expect.poll(position).toBeGreaterThan(atStart + 80)
-            await devtools.send("Input.dispatchTouchEvent", {
-              type: "touchEnd",
-              touchPoints: [],
-              timestamp: Date.now() / 1000,
-            })
-            expect(requests).toEqual(["older"])
+        await setupTimeline(page, {
+          messages,
+          pageMessages: (_, _limit, before) => {
+            if (before === "oldest") return { items: messages.slice(0, 2) }
+            if (before === "older") return { items: messages.slice(2, 12), cursor: "oldest" }
+            return { items: messages.slice(12), cursor: "older" }
           },
-        )
+          beforeMessagesResponse: ({ before }) => (before ? older.promise : Promise.resolve()),
+          onMessages: ({ before, phase }) => {
+            if (before && phase === "start") requests.push(before)
+          },
+        })
+        const timeline = page.locator('[data-slot="session-timeline-scroll"]')
+        const scroller = timeline.getByRole("region", { name: "scrollable content", exact: true })
+        const anchor = scroller.getByText("Reply 6 line 2.", { exact: true })
+        await expect(timeline.locator("[data-timeline-virtual-content]")).toBeVisible()
+        await page.evaluate(() => document.fonts.ready)
+        await scroller.evaluate((element) => {
+          element.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: -1 }))
+          element.scrollTop = 240
+        })
+        await expect(anchor).toBeInViewport()
+        const bounds = (await scroller.boundingBox())!
+        const devtools = await page.context().newCDPSession(page)
+        const point = { x: bounds.x + 120, y: bounds.y + 150 }
+        await devtools.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [point],
+          timestamp: restingTimestamp(),
+        })
+        await devtools.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x: point.x, y: point.y + 230 }],
+          timestamp: restingTimestamp(),
+        })
+        await expect.poll(() => requests).toEqual(["older"])
+        await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeLessThan(50)
+        const position = () => anchor.evaluate((element) => element.getBoundingClientRect().top)
+        const before = await position()
+
+        older.resolve()
+        await expect(scroller.getByText("Reply 5 line 0.", { exact: true })).toBeAttached()
+        await expect(anchor).toBeInViewport()
+        expect(await position()).toBeCloseTo(before, 0)
+
+        // Once a held gesture hits the native boundary, lifting the finger
+        // should expose the loaded range without a snap or a dead next swipe.
+        const toStart = await scroller.evaluate((element) => element.scrollTop)
+        await devtools.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x: point.x, y: point.y + 340 }],
+          timestamp: restingTimestamp(),
+        })
+        await expect(scroller).toHaveJSProperty("scrollTop", 0)
+        const atStart = await position()
+        expect(atStart).toBeCloseTo(before + toStart, 0)
+
+        await devtools.send("Input.dispatchTouchEvent", {
+          type: "touchEnd",
+          touchPoints: [],
+          timestamp: Date.now() / 1000,
+        })
+        expect(await position()).toBeCloseTo(atStart, 0)
+        await devtools.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [point],
+          timestamp: restingTimestamp(),
+        })
+        await devtools.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x: point.x, y: point.y + 120 }],
+          timestamp: restingTimestamp(),
+        })
+        await expect.poll(position).toBeGreaterThan(atStart + 80)
+        await devtools.send("Input.dispatchTouchEvent", {
+          type: "touchEnd",
+          touchPoints: [],
+          timestamp: Date.now() / 1000,
+        })
+        expect(requests).toEqual(["older"])
+      })
 
     test("reversing a touch drag stops following streamed output", async ({ page }, testInfo) => {
       const partID = "prt_mobile_stream"
