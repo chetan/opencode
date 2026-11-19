@@ -1,6 +1,3 @@
-// A detached reader within this distance of the top loads the next older page.
-export const HISTORY_SCROLL_THRESHOLD = 200
-
 // A page that never settles fails, so paging cannot stay "loading" forever.
 export const HISTORY_LOAD_TIMEOUT_MS = 30_000
 
