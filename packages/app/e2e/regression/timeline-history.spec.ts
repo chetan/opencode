@@ -138,8 +138,15 @@ test.describe("timeline history", () => {
       assistantMessage([textPart("prt_restore_3", text)], { id: "msg_restore_3", created: 4 }),
       userMessage([textPart("prt_restore_4", "Another prompt")], { id: "msg_restore_4", created: 5 }),
       assistantMessage([textPart("prt_restore_5", text)], { id: "msg_restore_5", created: 6 }),
-      userMessage([textPart("prt_restore_6", "Latest prompt")], { id: "msg_restore_6", created: 7 }),
-      assistantMessage([textPart("prt_restore_7", text)], { id: "msg_restore_7", created: 8 }),
+      // Keep the restored position out of the prefetch zone even while older rows are estimated.
+      ...Array.from({ length: 20 }, (_, index) =>
+        userMessage([textPart(`prt_restore_extra_${index}`, `Earlier prompt ${index}`)], {
+          id: `msg_restore_extra_${index}`,
+          created: 7 + index,
+        }),
+      ),
+      userMessage([textPart("prt_restore_6", "Latest prompt")], { id: "msg_restore_6", created: 27 }),
+      assistantMessage([textPart("prt_restore_7", text)], { id: "msg_restore_7", created: 28 }),
     ]
 
     const requests: (string | undefined)[] = []
@@ -166,7 +173,9 @@ test.describe("timeline history", () => {
       element.scrollTop = 0
     })
     await expect.poll(() => requests).toEqual([undefined, "older"])
-    await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(200)
+    await expect
+      .poll(() => scroller.evaluate((element) => element.scrollTop - element.clientHeight))
+      .toBeGreaterThan(0)
 
     await page.locator(`[data-slot="titlebar-tabs"] a[href="${sessionHref(other)}"]`).click()
     await expect(page.getByText("Other session", { exact: true })).toBeVisible()
