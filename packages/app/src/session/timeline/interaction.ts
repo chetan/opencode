@@ -15,7 +15,6 @@ import {
   FILL_REQUESTED_EVENT,
   HISTORY_LOAD_TIMEOUT_MS,
   HISTORY_RETRY_COOLDOWN_MS,
-  HISTORY_SCROLL_THRESHOLD,
   historySeekStatus,
   SCROLL_TOP_EVENT,
   SEEK_REQUESTED_EVENT,
@@ -240,14 +239,13 @@ export function createSessionTimelineInteraction(session: SessionModel, visible:
     requestFill()
   }
 
+  // Keep a screenful of older history ahead of the reader so a swipe has
+  // room to continue while the next page is in flight.
+  const nearHistoryTop = () =>
+    !!scroller && !!readTimelineOffset && readTimelineOffset() < Math.max(200, scroller.clientHeight)
+
   const onHistoryScroll = () => {
-    if (
-      !readTimelineOffset ||
-      readTimelineOffset() >= HISTORY_SCROLL_THRESHOLD ||
-      !canRequestScrollPage(untrack(historyState)) ||
-      untrack(follow.following)
-    )
-      return
+    if (!canRequestScrollPage(untrack(historyState)) || untrack(follow.following) || !nearHistoryTop()) return
     dispatchHistory(SCROLL_TOP_EVENT)
   }
 
@@ -278,7 +276,7 @@ export function createSessionTimelineInteraction(session: SessionModel, visible:
             !!scroller &&
             (effect.probe === "fill"
               ? follow.following() && scroller.scrollHeight <= scroller.clientHeight + 1
-              : !follow.following() && !!readTimelineOffset && readTimelineOffset() < HISTORY_SCROLL_THRESHOLD)
+              : !follow.following() && nearHistoryTop())
         },
         () => {
           historyProbe = undefined

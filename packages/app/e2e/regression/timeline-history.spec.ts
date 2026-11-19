@@ -187,7 +187,7 @@ test.describe("timeline history", () => {
     expect(requests).toEqual([undefined, "older", "oldest"])
   })
 
-  test("keeps visible rows fixed while an older page prepends", async ({ page }) => {
+  test("prefetches older history before the top and keeps visible rows fixed on prepend", async ({ page }) => {
     const older = Promise.withResolvers<void>()
     const requests: { before?: string; phase: "start" | "end" }[] = []
     await openStressTarget(page, {
@@ -195,25 +195,33 @@ test.describe("timeline history", () => {
       onMessages: (request) => requests.push(request),
     })
     const scroller = timelineScroller(page)
-    await scroller.hover()
-    await page.mouse.wheel(0, -100_000)
+    await scroller.evaluate((element) => {
+      element.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: -1 }))
+      element.scrollTop = Math.round(element.clientHeight * 0.75)
+    })
     await expect.poll(() => requests.some((request) => request.before && request.phase === "start")).toBe(true)
+    expect(await scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(200)
+    await scroller.evaluate((element) => {
+      element.scrollTop = 0
+    })
     await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeLessThanOrEqual(1)
 
-    const keys = await scroller.evaluate((element) => {
-      const view = element.getBoundingClientRect()
+    const visibleKeys = () =>
+      scroller.evaluate((element) => {
+        const view = element.getBoundingClientRect()
 
-      return [...element.querySelectorAll<HTMLElement>("[data-timeline-part-id]")]
-        .filter((row) => {
-          const rect = row.getBoundingClientRect()
+        return [...element.querySelectorAll<HTMLElement>("[data-timeline-part-id]")]
+          .filter((row) => {
+            const rect = row.getBoundingClientRect()
 
-          return rect.bottom > view.top && rect.top < view.bottom
-        })
-        .flatMap((row) => (row.dataset.timelinePartId ? [row.dataset.timelinePartId] : []))
-        .slice(0, 3)
-    })
+            return rect.bottom > view.top && rect.top < view.bottom
+          })
+          .flatMap((row) => (row.dataset.timelinePartId ? [row.dataset.timelinePartId] : []))
+          .slice(0, 3)
+      })
 
-    expect(keys).toHaveLength(3)
+    await expect.poll(visibleKeys).toHaveLength(3)
+    const keys = await visibleKeys()
 
     const positions = () =>
       scroller.evaluate((element, keys) => {
