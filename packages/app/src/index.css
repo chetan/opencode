@@ -94,6 +94,9 @@
      the region's opaque card. A mask fades the content itself, so the edge works over any theme's background;
      smoothstep stops avoid a visible horizon. */
   [data-slot="session-timeline-scroll"] > .scroll-view__viewport {
+    /* Keep the native top at zero so a continued drag can reveal held history
+       instead of rubber-banding the viewport past it. */
+    overscroll-behavior-y: none;
     --session-timeline-fade-start: var(--session-timeline-inset, 0px);
     scroll-padding-bottom: var(--session-timeline-inset, 0px);
     mask-image: linear-gradient(
