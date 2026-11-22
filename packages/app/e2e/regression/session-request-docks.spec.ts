@@ -490,6 +490,34 @@ test("names the MCP tool, the hook's message and the full input in the permissio
   await expect(permission.locator('[data-slot="permission-patterns"]').getByText("*", { exact: true })).toBeVisible()
 })
 
+test("reviews a formatted heredoc with its exact original one click away", async ({ page }) => {
+  const command = "python3 - <<'PY'\nif True:\n print(1)\nPY"
+  const formattedCommand = "python3 - <<'PY'\nif True:\n    print(1)\nPY"
+  await mockServer(page, {
+    sessionPermissions: {
+      [sessionID]: [
+        {
+          id: "permission-request",
+          sessionID,
+          action: "dcg",
+          resources: [command],
+          metadata: { command, formattedCommand, input: { "DCG report": "Review this command" } },
+        },
+      ],
+    },
+  })
+  await page.goto(sessionHref(sessionID))
+  await expectSessionTitle(page, title)
+
+  const permission = page.locator('[data-component="dock-prompt"][data-kind="permission"]')
+  const resource = permission.locator('[data-slot="permission-patterns"] code')
+  await expect(resource).toHaveCSS("white-space", "pre-wrap")
+  await expect(resource).toHaveJSProperty("textContent", formattedCommand)
+  await expect(resource.locator("span[style]").filter({ hasText: /^True$/ })).toBeVisible()
+  await permission.getByRole("button", { name: "Show original" }).click()
+  await expect(resource).toHaveJSProperty("textContent", command)
+})
+
 test("loads a running subagent's question without polling idle subagents on every update", async ({ page }) => {
   const runningID = "ses_request_running_subagent"
   const idleIDs = Array.from({ length: 20 }, (_, index) => `ses_request_idle_${index}`)

@@ -1528,6 +1528,11 @@
     align-items: center;
   }
 
+  [data-slot="permission-row"][data-variant="resources"] {
+    min-height: 0;
+    grid-template-columns: 20px minmax(0, 1fr);
+  }
+
   [data-slot="permission-icon"] {
     display: inline-flex;
     align-items: center;
@@ -1601,6 +1606,7 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    min-width: 0;
     scrollbar-width: none;
     -ms-overflow-style: none;
 
@@ -1614,6 +1620,8 @@
       font-weight: 440;
       line-height: var(--line-height-base);
       letter-spacing: -0.04px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
     }
   }
 
