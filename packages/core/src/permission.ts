@@ -244,8 +244,8 @@ const layer = Layer.effect(
     const request = Effect.fnUntraced(function* (input: AssertInput, message?: string) {
       const command = input.resources.length === 1 ? input.resources[0] : undefined
       const formatted =
-        command?.includes("<<") && isShellResource(input, command) && (yield* flags.enabled("permission_command_format"))
-          ? yield* formatPermissionCommand(command)
+        command && isShellResource(input, command) && (yield* flags.enabled("permission_command_format"))
+          ? yield* formatPermissionCommand(command, input.metadata?.shell)
           : undefined
       return {
         id: input.id ?? ID.create(),
