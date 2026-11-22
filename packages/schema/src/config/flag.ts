@@ -8,7 +8,8 @@ export const wildcard = "all"
  * named explicitly in `experimental.<key>` or `OPENCODE_FLAGS`. Read a flag with Core's `Flag.enabled("<key>")`.
  */
 export const registry = {
-  permission_command_format: "Format literal Python heredocs in permission previews using installed Ruff.",
+  permission_command_format:
+    "Format shell commands and literal Python heredocs in permission previews using installed shfmt and Ruff.",
   todo: "Enable the experimental todowrite tool.",
   media_blob: "Store new session media once in a deduplicated blob table instead of inline in every message row.",
   automations:

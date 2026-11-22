@@ -328,6 +328,7 @@ export const Plugin = {
           action: name,
           resources: parsed.commands.map((command) => command.resource),
           save: parsed.commands.map((command) => command.save),
+          metadata: { shell: ShellSelect.name(invocation.shell) },
           ...Permission.invocation(context),
         })
       // Approval can outlive the directory, so validate immediately before spawning.
