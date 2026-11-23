@@ -19,6 +19,26 @@ export function serviceWorker(directory: string) {
     registerType: "prompt",
     injectRegister: false,
     manifest: false,
+    integration: {
+      // The fallback and denylist follow Vite's resolved `base`, such as `/opencode/` for `vite build --base=/opencode/`.
+      configureOptions(config, options) {
+        const prefix = config.base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+
+        options.workbox = {
+          ...options.workbox,
+          navigateFallback: `${config.base}index.html`,
+          // Pairing links must reach the server so it can set the session cookie.
+          navigateFallbackDenylist: [
+            new RegExp(`^${prefix}(?:api|auth)(?:/|$)`),
+            new RegExp(`^${prefix}(?:_assets|assets)(?:/|$)`),
+            // SSO callbacks and portals belong to the proxy, not the cached app router.
+            /^\/(?:outpost\.goauthentik\.io|oauth2|\.pomerium|_oauth|cdn-cgi|\.auth|authelia)(?:[/?]|$)/,
+            // Proxy recovery must reach the network without removing the installed worker.
+            /[?&]reauth=/,
+          ],
+        }
+      },
+    },
     workbox: {
       // Workbox runs after Sentry's upload and cleanup, so do not publish an unuploaded map.
       sourcemap: false,
@@ -27,16 +47,6 @@ export function serviceWorker(directory: string) {
       // Keep each open tab on its complete build until all old clients close.
       skipWaiting: false,
       inlineWorkboxRuntime: true,
-      navigateFallback: "/index.html",
-      // Pairing links must reach the server so it can set the session cookie.
-      navigateFallbackDenylist: [
-        /^\/(?:api|auth)(?:\/|$)/,
-        /^\/(?:_assets|assets)(?:\/|$)/,
-        // SSO callbacks and portals belong to the proxy, not the cached app router.
-        /^\/(?:outpost\.goauthentik\.io|oauth2|\.pomerium|_oauth|cdn-cgi|\.auth|authelia)(?:[/?]|$)/,
-        // Proxy recovery must reach the network without removing the installed worker.
-        /[?&]reauth=/,
-      ],
       // Include lazy chunks and non-JS dependencies, not just the startup bundle.
       globPatterns: ["**/*"],
       globIgnores: ["**/*.map", "_headers", "_redirects"],

@@ -1,4 +1,5 @@
 import { createBrowserDraftStore } from "@/runtime/persistence/drafts"
+import { basePath } from "./base-path"
 import type { Platform } from "./platform"
 import { createWebFetch, watchWebAssets } from "./web-fetch"
 
@@ -62,5 +63,6 @@ function getCurrentServerUrl() {
     return `http://${host}:${import.meta.env.VITE_OPENCODE_SERVER_PORT ?? "4096"}`
   }
 
-  return location.origin
+  // A build under a base path reaches the server through the same prefix.
+  return location.origin + basePath
 }
