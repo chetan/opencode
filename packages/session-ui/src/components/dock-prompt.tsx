@@ -21,7 +21,9 @@ export function DockPrompt(props: {
     >
       <div data-slot={slot("body")}>
         <div data-slot={slot("header")}>{props.header}</div>
-        <div data-slot={slot("content")}>{props.children}</div>
+        <div data-slot={slot("content")} data-scrollable={props.kind === "permission" ? "" : undefined}>
+          {props.children}
+        </div>
       </div>
       <div data-slot={slot("footer")}>{props.footer}</div>
     </div>
