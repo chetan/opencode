@@ -24,7 +24,7 @@ export interface DialogProps extends ParentProps {
    * normal: 480px wide, for confirmations and small forms. large: 720×600, for palettes, pickers and lists.
    * x-large: 880×680, for long documents and settings-like panels. Each clamps to the window.
    */
-  size?: "normal" | "large" | "x-large"
+  size?: "normal" | "large" | "x-large" | "fullscreen"
   /** Height follows the content, up to the size's height. Large sizes grow down from a fixed top edge. */
   fit?: boolean
   /** Fit within the preset's height and keep its top edge as content changes. */

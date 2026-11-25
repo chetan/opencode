@@ -270,6 +270,8 @@ test("shows a pending permission dock", async ({ page }) => {
   await expect(permission).toBeVisible()
   await expect(permission.getByText("git status")).toBeVisible()
   await expect(permission.getByText("git diff")).toBeVisible()
+  await expect(permission.getByRole("button", { name: "Copy original" })).toHaveCount(2)
+  await expect(permission.getByRole("button", { name: "Full screen" })).toHaveCount(2)
   await expect(permission.locator('[data-slot="permission-footer-actions"] button')).toHaveCount(3)
   await expect(page.locator('[data-component="composer"]')).toHaveCount(0)
 
@@ -490,9 +492,10 @@ test("names the MCP tool, the hook's message and the full input in the permissio
   await expect(permission.locator('[data-slot="permission-patterns"]').getByText("*", { exact: true })).toBeVisible()
 })
 
-test("reviews a formatted heredoc with its exact original one click away", async ({ page }) => {
-  const command = "python3 - <<'PY'\nif True:\n print(1)\nPY"
-  const formattedCommand = "python3 - <<'PY'\nif True:\n    print(1)\nPY"
+test("reviews a long formatted heredoc and copies its exact original", async ({ page, context }) => {
+  const command = `python3 - <<'PY'\nif True:\n${" print(1)\n".repeat(100)}PY`
+  const formattedCommand = command.replaceAll(" print", "    print")
+  await context.grantPermissions(["clipboard-read", "clipboard-write"])
   await mockServer(page, {
     sessionPermissions: {
       [sessionID]: [
@@ -514,6 +517,23 @@ test("reviews a formatted heredoc with its exact original one click away", async
   await expect(resource).toHaveCSS("white-space", "pre-wrap")
   await expect(resource).toHaveJSProperty("textContent", formattedCommand)
   await expect(resource.locator("span[style]").filter({ hasText: /^True$/ })).toBeVisible()
+  await permission.getByText("DCG report: Review this command").dblclick({ position: { x: 8, y: 8 } })
+  expect(await page.evaluate(() => getSelection()?.toString().trim())).toBe("DCG")
+  await page.setViewportSize({ width: 375, height: 667 })
+  await expect(permission.getByRole("button", { name: "Allow once" })).toBeInViewport({ ratio: 1 })
+  const patterns = permission.locator('[data-slot="permission-patterns"]')
+  await patterns.focus()
+  await patterns.press("End")
+  await expect.poll(() => patterns.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+  await patterns.press("Home")
+  const expand = permission.getByRole("button", { name: "Full screen" })
+  await expand.click()
+  const reader = page.getByRole("dialog", { name: "Shell command" })
+  await expect(reader.locator("code")).toHaveJSProperty("textContent", formattedCommand)
+  await reader.getByRole("button", { name: "Copy original" }).click()
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(command)
+  await page.keyboard.press("Escape")
+  await expect(expand).toBeFocused()
   await permission.getByRole("button", { name: "Show original" }).click()
   await expect(resource).toHaveJSProperty("textContent", command)
 })

@@ -1,7 +1,9 @@
 import { Option, Schema } from "effect"
-import { createSignal, For, Show } from "solid-js"
+import { createSignal, createUniqueId, For, onCleanup, Show } from "solid-js"
 import type { PermissionRequest } from "@opencode/client/promise"
 import { Button } from "@opencode/ui/button"
+import { useDialog } from "@opencode/ui/context/dialog"
+import { Dialog, DialogHeader, DialogTitle } from "@opencode/ui/dialog"
 import { DockPrompt } from "@opencode/session-ui/dock-prompt"
 import { ShellCode } from "@opencode/session-ui/shell-code"
 import { createCopyFeedback } from "@opencode/session-ui/copy"
@@ -19,8 +21,6 @@ export function SessionPermissionDock(props: {
   onDecide: (response: "once" | "always" | "reject") => void
 }) {
   const language = useLanguage()
-  const [original, setOriginal] = createSignal<string>()
-  const copy = createCopyFeedback()
 
   const toolDescription = () => {
     const key = `settings.permissions.tool.${props.request.action}.description`
@@ -93,7 +93,7 @@ export function SessionPermissionDock(props: {
           <span data-slot="permission-spacer" aria-hidden="true" />
           {/* Scrolls rather than truncates: the user approves these arguments, so all of them must be reachable */}
           <div data-slot="permission-input" data-scrollable>
-            <For each={input()}>{(line) => <code class="text-text-weak break-all">{line}</code>}</For>
+            <For each={input()}>{(line) => <code class="text-v2-text-text-muted break-all">{line}</code>}</For>
           </div>
         </div>
       </Show>
@@ -101,7 +101,7 @@ export function SessionPermissionDock(props: {
       <Show when={props.request.resources.length > 0}>
         <div data-slot="permission-row" data-variant="resources">
           <span data-slot="permission-spacer" aria-hidden="true" />
-          <div data-slot="permission-patterns" data-scrollable>
+          <div data-slot="permission-patterns" data-scrollable tabindex="0">
             <For each={props.request.resources}>
               {(pattern) => {
                 const formatted = () =>
@@ -110,25 +110,7 @@ export function SessionPermissionDock(props: {
                     : undefined
                 return (
                   <Show when={isShellResource(props.request, pattern)} fallback={<code dir="ltr">{pattern}</code>}>
-                    <Show when={formatted()}>
-                      <div>
-                        <Button
-                          variant="ghost"
-                          size="small"
-                          onClick={() => setOriginal(original() === props.request.id ? undefined : props.request.id)}
-                        >
-                          {language.t(
-                            original() === props.request.id
-                              ? "ui.permission.showFormatted"
-                              : "ui.permission.showOriginal",
-                          )}
-                        </Button>
-                        <Button variant="ghost" size="small" onClick={() => copy.copy(pattern)}>
-                          {language.t(copy.copied() ? "ui.message.copied" : "ui.permission.copyOriginal")}
-                        </Button>
-                      </div>
-                    </Show>
-                    <ShellCode text={original() === props.request.id ? pattern : (formatted() ?? pattern)} />
+                    <CommandReview command={pattern} formatted={formatted()} />
                   </Show>
                 )
               }}
@@ -137,5 +119,56 @@ export function SessionPermissionDock(props: {
         </div>
       </Show>
     </DockPrompt>
+  )
+}
+
+function CommandReview(props: { command: string; formatted?: string }) {
+  const language = useLanguage()
+  const dialog = useDialog()
+  const id = createUniqueId()
+  const copy = createCopyFeedback()
+  const [original, setOriginal] = createSignal(false)
+  const text = () => (original() ? props.command : (props.formatted ?? props.command))
+  onCleanup(() => dialog.close(id))
+
+  const controls = () => (
+    <>
+      <Show when={props.formatted}>
+        <Button variant="ghost" size="small" onClick={() => setOriginal(!original())}>
+          {language.t(original() ? "ui.permission.showFormatted" : "ui.permission.showOriginal")}
+        </Button>
+      </Show>
+      <Button variant="ghost" size="small" onClick={() => copy.copy(props.command)}>
+        {language.t(copy.copied() ? "ui.message.copied" : "ui.permission.copyOriginal")}
+      </Button>
+    </>
+  )
+  const expand = () =>
+    dialog.show(
+      () => (
+        <Dialog size="fullscreen">
+          <DialogHeader>
+            <DialogTitle>{language.t("ui.promptInput.shell")}</DialogTitle>
+          </DialogHeader>
+          <div data-slot="permission-command-tools">{controls()}</div>
+          <div data-slot="permission-command-reader" data-scrollable tabindex="0">
+            <ShellCode text={text()} />
+          </div>
+        </Dialog>
+      ),
+      undefined,
+      id,
+    )
+
+  return (
+    <div>
+      <div data-slot="permission-command-tools">
+        {controls()}
+        <Button variant="ghost" size="small" onClick={expand}>
+          {language.t("ui.permission.expandCommand")}
+        </Button>
+      </div>
+      <ShellCode text={text()} />
+    </div>
   )
 }

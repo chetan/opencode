@@ -344,6 +344,7 @@ const source = {
   "ui.permission.showOriginal": "Show original",
   "ui.permission.showFormatted": "Show formatted",
   "ui.permission.copyOriginal": "Copy original",
+  "ui.permission.expandCommand": "Full screen",
 
   "ui.message.expand": "Expand message",
   "ui.message.collapse": "Collapse message",

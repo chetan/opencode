@@ -1502,7 +1502,9 @@
 }
 
 [data-component="dock-prompt"][data-kind="permission"] {
-  max-height: 100dvh;
+  max-height: 75dvh;
+  -webkit-user-select: text;
+  user-select: text;
 
   [data-slot="permission-body"] {
     display: flex;
@@ -1519,18 +1521,14 @@
 
   [data-slot="permission-row"] {
     display: grid;
-    grid-template-columns: 20px 1fr;
+    flex-shrink: 0;
+    grid-template-columns: 20px minmax(0, 1fr);
     column-gap: 8px;
     align-items: start;
   }
 
   [data-slot="permission-row"][data-variant="header"] {
     align-items: center;
-  }
-
-  [data-slot="permission-row"][data-variant="resources"] {
-    min-height: 0;
-    grid-template-columns: 20px minmax(0, 1fr);
   }
 
   [data-slot="permission-icon"] {
@@ -1558,6 +1556,8 @@
     gap: 4px;
     flex: 1;
     min-height: 0;
+    overflow: auto;
+    overflow-wrap: anywhere;
   }
 
   [data-slot="permission-hint"] {
@@ -1583,7 +1583,7 @@
     flex-direction: column;
     gap: 2px;
     margin-top: 8px;
-    max-height: 160px;
+    max-height: min(160px, 20dvh);
     overflow-y: auto;
 
     code {
@@ -1607,21 +1607,16 @@
     min-height: 0;
     overflow-y: auto;
     min-width: 0;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+    max-height: 36dvh;
 
-    &::-webkit-scrollbar {
-      display: none;
-    }
+    [data-slot="permission-command-tools"] {
+      position: sticky;
+      top: 0;
+      background: var(--v2-background-bg-base);
 
-    code {
-      font-family: var(--v2-font-family-code);
-      font-size: 13px;
-      font-weight: 440;
-      line-height: var(--line-height-base);
-      letter-spacing: -0.04px;
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
+      [data-color-scheme="dark"] & {
+        background: var(--v2-background-bg-layer-01);
+      }
     }
   }
 
@@ -1637,11 +1632,54 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 
     [data-component="button-v2"] {
       padding-left: 12px;
       padding-right: 12px;
     }
+  }
+}
+
+[data-slot="permission-command-tools"] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+[data-size="fullscreen"] [data-slot="permission-command-tools"] {
+  padding-inline: 16px;
+}
+
+[data-slot="permission-command-reader"] {
+  align-self: stretch;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 16px 16px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+:is([data-slot="permission-patterns"], [data-slot="permission-command-reader"]) code {
+  display: block;
+  font-family: var(--v2-font-family-code);
+  font-size: 13px;
+  font-weight: 440;
+  line-height: var(--line-height-base);
+  letter-spacing: -0.04px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (pointer: coarse) {
+  [data-slot="permission-command-tools"] button,
+  [data-size="fullscreen"] [data-slot="dialog-close-button"] {
+    min-height: 44px;
+    min-width: 44px;
   }
 }
 
